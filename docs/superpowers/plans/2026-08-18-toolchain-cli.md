@@ -4353,6 +4353,23 @@ The design spec listed `tools stack` as key-only. Implementation found
 reads it with no key and only calls `/v1/tools/{slug}/stack` with one. If
 this surprises you, it's a real, deliberate correction — not a bug.
 
+## `--debug` and the httpx/httpcore logging landmine
+
+`ApiSource.curl()` is structurally leak-proof — it never references the raw
+key attribute, only `$TOOLCHAIN_API_KEY`. But `redact()` (`src/toolchain/log.py`)
+has no call site anywhere in this codebase yet, found during Task 7's review.
+If a future `--debug` enhancement enables raw `httpx`/`httpcore` DEBUG-level
+logging (e.g. `logging.getLogger("httpx").setLevel(logging.DEBUG)` or a bare
+`logging.basicConfig(level=logging.DEBUG)` that httpx's loggers pick up),
+those libraries log request headers independently of `ApiSource` — including
+the real `x-api-key` value — straight to stderr, outside this class's
+control entirely. `configure_logging()` (Task 5) only configures a logger
+named `"toolchain"` with `propagate=False`, so it does NOT currently touch
+httpx's own loggers — that's why this is a landmine and not a live bug.
+**Before wiring any future feature that touches httpx/httpcore's own
+logging, either keep it off entirely or run every line through `redact()`
+first.**
+
 ## Adding a new product (a third `--site`)
 
 Add one `Site(site_base=..., api_base=...)` entry to `SITES` in
