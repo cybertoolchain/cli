@@ -1872,18 +1872,22 @@ def cli(
     search_fields: str | None,
 ) -> None:
     """The Cyber Toolchain / aitoolchain command-line client."""
-    ctx.obj = resolve_config(
-        api_key=api_key,
-        site=site_key,
-        output=output,
-        verbose=verbose,
-        debug=debug,
-        cache=cache,
-        limit=limit,
-        short=short,
-        timeout=timeout,
-        search_fields=search_fields,
-    )
+    try:
+        ctx.obj = resolve_config(
+            api_key=api_key,
+            site=site_key,
+            output=output,
+            verbose=verbose,
+            debug=debug,
+            cache=cache,
+            limit=limit,
+            short=short,
+            timeout=timeout,
+            search_fields=search_fields,
+        )
+    except ToolchainError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(exc.exit_code)
     configure_logging(verbose)
     if ctx.invoked_subcommand is None:
         click.echo(BANNER, err=True)
@@ -1920,6 +1924,18 @@ if __name__ == "__main__":
 
 Run: `uv run pytest tests/test_main.py -v`
 Expected: PASS (4 passed).
+
+Plan bug found here: with the `try`/`except` left out of the `cli()` callback
+(i.e. `resolve_config()` called bare, and `ToolchainError` handled only in
+`main()`), `test_unknown_site_flag_exits_1_with_message` fails — exit code is
+1, but `result.output` is empty. `main()`'s try/except only runs on the real
+`toolchain` entry point (`cli(standalone_mode=False)`); the test invokes
+`cli` directly via `CliRunner`, where Click's own `standalone_mode=True`
+machinery only auto-handles `click.ClickException`/`Exit`/`Abort` — not our
+`ToolchainError` hierarchy — so a raw, unprinted exception propagates. The
+`cli()` callback itself must catch `ToolchainError` from `resolve_config()`,
+echo it, and `sys.exit(exc.exit_code)`, which is now reflected in the code
+block above.
 
 - [ ] **Step 5: Install and smoke-test the real entry point**
 
