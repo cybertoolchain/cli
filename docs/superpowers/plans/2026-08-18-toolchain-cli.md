@@ -2532,23 +2532,24 @@ Append to `src/toolchain/groups/tools.py`:
 @click.argument("slug")
 @click.option("--since", default=None)
 @click.option("--until", default=None)
-@click.option("--limit", "release_limit", type=int, default=None)
 @click.pass_context
 @handle_errors
-def tools_releases(ctx: click.Context, slug: str, since, until, release_limit) -> None:
+def tools_releases(ctx: click.Context, slug: str, since, until) -> None:
     """One tool's release history."""
     config = get_config(ctx)
     source = resolve_source(config)
     if config.api_key:
         params = {
             k: v
-            for k, v in {"since": since, "until": until, "limit": release_limit}.items()
+            for k, v in {"since": since, "until": until, "limit": config.limit}.items()
             if v is not None
         }
         data = source.fetch(f"tools/{slug}/releases", **params)
     else:
         entries = source.fetch("entries.json")
         data = [row for row in entries if row.get("name") == slug.lower()]
+        if config.limit is not None:
+            data = data[: config.limit]
     emit(data, config)
 
 
@@ -3085,6 +3086,11 @@ def test_releases_latest_sorts_newest_first_and_applies_default_limit(monkeypatc
 
 
 def test_releases_latest_limit_flag(monkeypatch):
+    # --limit is the GLOBAL flag (Task 3/12) — there is no per-command
+    # --limit anywhere in this CLI, precisely to avoid colliding with it
+    # under GlobalOptionGroup (see Task 11's ledger: a bare "--limit" after
+    # the subcommand is indistinguishable from a misplaced global flag).
+    # So it goes BEFORE the subcommand here, like every other global flag.
     entries = load("site_entries.json")
 
     class StubSource:
@@ -3092,9 +3098,22 @@ def test_releases_latest_limit_flag(monkeypatch):
             return entries
 
     monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
-    result = CliRunner().invoke(cli, ["releases", "latest", "--limit", "1"])
+    result = CliRunner().invoke(cli, ["--limit", "1", "releases", "latest"])
     assert result.exit_code == 0
     assert len(json.loads(result.output)) == 1
+
+
+def test_releases_list_limit_flag(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["--limit", "2", "releases", "list"])
+    assert result.exit_code == 0
+    assert len(json.loads(result.output)) == 2
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -3125,11 +3144,12 @@ def releases() -> None:
 @click.option("--categories", default=None, help="Comma-separated taxonomy slugs.")
 @click.option("--since", default=None)
 @click.option("--until", default=None)
-@click.option("--limit", type=int, default=None)
 @click.pass_context
 @handle_errors
-def releases_list(ctx: click.Context, tools_, categories, since, until, limit) -> None:
-    """Filterable across the whole watchlist, not just one tool."""
+def releases_list(ctx: click.Context, tools_, categories, since, until) -> None:
+    """Filterable across the whole watchlist, not just one tool. Use the
+    GLOBAL -l/--limit (before the subcommand) to cap how many come back —
+    there is no separate --limit here."""
     config = get_config(ctx)
     source = resolve_source(config)
     if config.api_key:
@@ -3140,7 +3160,7 @@ def releases_list(ctx: click.Context, tools_, categories, since, until, limit) -
                 "categories": categories,
                 "since": since,
                 "until": until,
-                "limit": limit,
+                "limit": config.limit,
             }.items()
             if v is not None
         }
@@ -3158,19 +3178,21 @@ def releases_list(ctx: click.Context, tools_, categories, since, until, limit) -
             data = [row for row in data if row.get("published_at", "") >= since]
         if until:
             data = [row for row in data if row.get("published_at", "") <= until]
-        if limit is not None:
-            data = data[:limit]
+        if config.limit is not None:
+            data = data[: config.limit]
     emit(data, config)
 
 
 @releases.command("latest")
-@click.option("--limit", type=int, default=20)
 @click.pass_context
 @handle_errors
-def releases_latest(ctx: click.Context, limit: int) -> None:
+def releases_latest(ctx: click.Context) -> None:
     """Newest releases across the whole watchlist, no filters — the CLI
-    equivalent of the Tail newsletter feed."""
+    equivalent of the Tail newsletter feed. Use the GLOBAL -l/--limit
+    (before the subcommand) to change the default of 20 — there is no
+    separate --limit here."""
     config = get_config(ctx)
+    limit = config.limit if config.limit is not None else 20
     source = resolve_source(config)
     if config.api_key:
         data = source.fetch("releases", limit=limit)
@@ -3183,7 +3205,7 @@ def releases_latest(ctx: click.Context, limit: int) -> None:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_group_releases.py -v`
-Expected: PASS (6 passed).
+Expected: PASS (7 passed).
 
 - [ ] **Step 5: Register the group**
 
@@ -3457,26 +3479,26 @@ def issues() -> None:
 
 @issues.command("list")
 @click.option("--series", default=None, type=click.Choice(["tail", "head", "diff"]))
-@click.option("--limit", type=int, default=None)
 @click.pass_context
 @handle_errors
-def issues_list(ctx: click.Context, series, limit) -> None:
+def issues_list(ctx: click.Context, series) -> None:
     """The issue index. No key: every entry that has run in a public
     issue, grouped by issue — narrower than the full archive (no
     paywalled entries, no assimilated summary block). With a key: the
-    real issue index."""
+    real issue index. Use the GLOBAL -l/--limit (before the subcommand)
+    to cap how many come back — there is no separate --limit here."""
     config = get_config(ctx)
     source = resolve_source(config)
     if config.api_key:
-        params = {k: v for k, v in {"series": series, "limit": limit}.items() if v is not None}
+        params = {k: v for k, v in {"series": series, "limit": config.limit}.items() if v is not None}
         data = source.fetch("issues", **params)
     else:
         entries = source.fetch("entries.json")
         data = entries
         if series:
             data = [row for row in data if row.get("issue_slug", "").startswith(f"{series}/")]
-        if limit is not None:
-            data = data[:limit]
+        if config.limit is not None:
+            data = data[: config.limit]
     emit(data, config)
 
 
@@ -4223,12 +4245,14 @@ from ..source import resolve_source
 @click.command("search")
 @click.argument("query")
 @click.option("--type", "type_", default=None, type=click.Choice(["tool", "release"]))
-@click.option("--limit", type=int, default=20)
 @click.pass_context
 @handle_errors
-def search(ctx: click.Context, query: str, type_, limit: int) -> None:
-    """Full-text over tool names, vendors, and release summaries."""
+def search(ctx: click.Context, query: str, type_) -> None:
+    """Full-text over tool names, vendors, and release summaries. Use the
+    GLOBAL -l/--limit (before the subcommand) to change the default of 20
+    — there is no separate --limit here."""
     config = get_config(ctx)
+    limit = config.limit if config.limit is not None else 20
     source = resolve_source(config)
     if config.api_key:
         params = {"q": query, "limit": limit}
