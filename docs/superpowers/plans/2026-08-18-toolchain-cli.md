@@ -3741,7 +3741,16 @@ git commit -m "feat: issues download (json or the rendered html page)"
 # tests/test_tui_reader.py
 from __future__ import annotations
 
+import re
+
 from toolchain.tui.reader import render_issue
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI.sub("", text)
+
 
 ENTRIES = [
     {
@@ -3776,7 +3785,14 @@ def test_render_issue_includes_feature_bullets():
 
 
 def test_render_issue_includes_the_command_example():
-    assert "nmap -e eth1 -S 192.168.1.50" in render_issue(ENTRIES)
+    # Rich syntax-highlights a ```shell fence token-by-token, inserting ANSI
+    # escapes BETWEEN tokens — so the raw rendered string never contains the
+    # command as one contiguous substring even though it's all there and
+    # correctly highlighted. Strip ANSI escapes before asserting, rather
+    # than dropping the shell lexer (which would silently turn off exactly
+    # the highlighting this reader exists to provide).
+    plain = _strip_ansi(render_issue(ENTRIES))
+    assert "nmap -e eth1 -S 192.168.1.50" in plain
 
 
 def test_render_issue_handles_empty_list():
