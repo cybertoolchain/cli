@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "hypothesis>=6.100"]
+dev = ["pytest>=8.0", "hypothesis>=6.100", "pytest-asyncio>=0.24"]
 
 [project.scripts]
 toolchain = "toolchain.main:main"
@@ -27,3 +27,6 @@ toolchain = "src/toolchain"
 
 [tool.setuptools.package-data]
 toolchain = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

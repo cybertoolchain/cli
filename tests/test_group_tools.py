@@ -257,3 +257,9 @@ def test_tools_sbom_with_key_uses_v1_path(monkeypatch):
 def test_tools_sbom_help_states_the_key_requirement():
     result = CliRunner().invoke(cli, ["tools", "sbom", "--help"])
     assert "requires an API key" in result.output
+
+
+def test_tools_browse_is_registered_and_has_help():
+    result = CliRunner().invoke(cli, ["tools", "browse", "--help"])
+    assert result.exit_code == 0
+    assert "Interactively" in result.output

@@ -197,3 +197,22 @@ def tools_sbom(ctx: click.Context, slug: str) -> None:
     source = resolve_source(config)
     data = source.fetch(f"tools/{slug}/sbom")
     emit(data, config)
+
+
+@tools.command("browse")
+@click.pass_context
+@handle_errors
+def tools_browse(ctx: click.Context) -> None:
+    """Interactively search and select from the tools list. Human-only —
+    does not go through -o/--output."""
+    from ..tui.browse import ToolBrowserApp
+
+    config = get_config(ctx)
+    source = resolve_source(config)
+    path = "tools" if config.api_key else "tools.json"
+    data = source.fetch(path)
+    rows = data.get("tools", data if isinstance(data, list) else [])
+    app = ToolBrowserApp(rows)
+    selected = app.run()
+    if selected is not None:
+        click.echo(f"{selected.get('tool')}: {selected.get('url', selected.get('docs_url', ''))}")
