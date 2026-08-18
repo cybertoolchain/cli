@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "chart": "notes_quality",
+    "generated_at": "2026-08-17T16:09:34Z",
+    "n": {"tools_ranked": 479, "ineligible_tools": 310, "zero_score_tools": 13}
+  },
+  "data": {
+    "tools": [
+      {
+        "name": "▒▒▒▒▒▒▒",
+        "display": "▒▒▒▒▒▒▒",
+        "category": "container-security",
+        "score": 87.0
+      }
+    ]
+  }
+}

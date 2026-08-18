@@ -1,0 +1,14 @@
+{
+  "chart": "notes_quality",
+  "withheld": true,
+  "data": {
+    "tools": [
+      {
+        "name": "▒▒▒▒▒▒▒",
+        "display": "▒▒▒▒▒▒▒",
+        "category": "container-security",
+        "score": 87.0
+      }
+    ]
+  }
+}

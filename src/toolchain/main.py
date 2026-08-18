@@ -105,6 +105,10 @@ from .groups.issues import issues as issues_group
 
 cli.add_command(issues_group, name="issues")
 
+from .groups.analytics import analytics as analytics_group
+
+cli.add_command(analytics_group, name="analytics")
+
 
 def main() -> None:
     try:

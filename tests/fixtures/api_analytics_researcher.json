@@ -1,0 +1,9 @@
+{
+  "chart": "notes_quality",
+  "withheld": false,
+  "data": {
+    "tools": [
+      {"name": "dockerscan", "display": "dockerscan", "category": "container-security", "score": 87.0}
+    ]
+  }
+}
