@@ -27,7 +27,7 @@ def _to_markdown(entries: list[dict[str, Any]]) -> str:
         for example in entry.get("usage_examples", []):
             if example.get("description"):
                 lines.append(example["description"])
-            lines.append("```")
+            lines.append("```shell")
             lines.append(example.get("command", ""))
             lines.append("```")
             lines.append("")
