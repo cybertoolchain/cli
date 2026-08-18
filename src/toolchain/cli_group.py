@@ -15,6 +15,7 @@ GLOBAL_FLAGS: frozenset[str] = frozenset(
         "-s", "--short",
         "-t", "--timeout",
         "--search-fields",
+        "--mode",
     }
 )
 
@@ -26,7 +27,10 @@ GLOBAL_FLAGS: frozenset[str] = frozenset(
 #: still-correctly-placed -v as misplaced. (Found in Task 11's review: the
 #: plan's own first draft of this function had exactly that bug.)
 _VALUE_FLAGS: frozenset[str] = frozenset(
-    {"-k", "--api-key", "--site", "-o", "--output", "-l", "--limit", "-t", "--timeout", "--search-fields"}
+    {
+        "-k", "--api-key", "--site", "-o", "--output", "-l", "--limit",
+        "-t", "--timeout", "--search-fields", "--mode",
+    }
 )
 
 

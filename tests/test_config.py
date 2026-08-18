@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from toolchain.config import SITES, VALID_OUTPUTS, resolve_config
+from toolchain.config import SITES, VALID_MODES, VALID_OUTPUTS, resolve_config
 from toolchain.models import UserInputError
 
 
@@ -69,3 +69,27 @@ def test_negative_timeout_flag_raises_user_input_error():
 
 def test_valid_outputs_are_stable():
     assert VALID_OUTPUTS == ("json", "table", "csv", "tsv")
+
+
+def test_mode_defaults_to_dark():
+    assert resolve_config().mode == "dark"
+
+
+def test_mode_flag_beats_env(monkeypatch):
+    monkeypatch.setenv("TOOLCHAIN_MODE", "sepia")
+    config = resolve_config(mode="contrast")
+    assert config.mode == "contrast"
+
+
+def test_mode_env_beats_default(monkeypatch):
+    monkeypatch.setenv("TOOLCHAIN_MODE", "light")
+    assert resolve_config().mode == "light"
+
+
+def test_invalid_mode_raises_user_input_error():
+    with pytest.raises(UserInputError, match="dark, light, sepia, contrast"):
+        resolve_config(mode="neon")
+
+
+def test_valid_modes_are_stable():
+    assert VALID_MODES == ("dark", "light", "sepia", "contrast")

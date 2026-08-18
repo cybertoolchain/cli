@@ -10,21 +10,31 @@ from .config import VALID_OUTPUTS, resolve_config
 from .log import configure_logging
 from .models import ToolchainError
 
-# Brand kit ASCII wordmark, verbatim from
-# generator/site/public/brand/cyber-toolchain-ascii.txt — embedded rather
+# Brand kit ASCII wordmark ("toolchain" block only — the "cyber" block
+# is dropped, this CLI is shared with aitoolchain), verbatim from
+# generator/site/public/brand/cyber-toolchain-ascii.txt. Embedded rather
 # than read from that sibling repo, since a customer running this CLI
 # won't have it checked out.
 _LOGO = (
-    "┌─┐┬ ┬┌┐ ┌─┐┬─┐\n"
-    "│  └┬┘├┴┐├┤ ├┬┘\n"
-    "└─┘ ┴ └─┘└─┘┴└─\n"
     "┌┬┐┌─┐┌─┐┬  ┌─┐┬ ┬┌─┐┬┌┐┌\n"
     " │ │ ││ ││  │  ├─┤├─┤││││\n"
     " ┴ └─┘└─┘┴─┘└─┘┴ ┴┴ ┴┴┘└┘"
 )
-# brand.yaml palette.dark.teal (#34e2d4) — the one accent every theme
-# keys off of. click strips this automatically for non-tty output / NO_COLOR.
-BANNER = "\n" + click.style(_LOGO, fg=(0x34, 0xE2, 0xD4), bold=True) + "\n"
+
+# brand.yaml palette.<mode>.teal — the one accent every site theme keys
+# off of, per theme. click strips ANSI automatically for non-tty output
+# and when NO_COLOR is set.
+MODE_COLORS: dict[str, tuple[int, int, int]] = {
+    "dark": (0x34, 0xE2, 0xD4),
+    "light": (0x05, 0x6F, 0x66),
+    "sepia": (0x0F, 0x73, 0x6A),
+    "contrast": (0x45, 0xF0, 0xDE),
+}
+
+
+def render_banner(mode: str) -> str:
+    color = MODE_COLORS[mode]
+    return "\n" + click.style(_LOGO, fg=color, bold=True) + "\n"
 
 TLDR = """\
 toolchain tools list                    # every tracked tool
@@ -51,6 +61,12 @@ every option.
 @click.option("-s", "--short", is_flag=True, default=False)
 @click.option("-t", "--timeout", type=float, default=None)
 @click.option("--search-fields", default=None)
+@click.option(
+    "--mode",
+    default=None,
+    help="Color palette for the banner: dark|light|sepia|contrast, matching "
+    "the website's 4 themes (env: TOOLCHAIN_MODE, default: dark).",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -64,6 +80,7 @@ def cli(
     short: bool,
     timeout: float | None,
     search_fields: str | None,
+    mode: str | None,
 ) -> None:
     """The Cyber Toolchain / aitoolchain command-line client."""
     try:
@@ -78,13 +95,14 @@ def cli(
             short=short,
             timeout=timeout,
             search_fields=search_fields,
+            mode=mode,
         )
     except ToolchainError as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(exc.exit_code)
     configure_logging(verbose)
     if ctx.invoked_subcommand is None:
-        click.echo(BANNER, err=True)
+        click.echo(render_banner(ctx.obj.mode), err=True)
         click.echo(
             "Run 'toolchain --help' for commands, or 'toolchain tldr' for a quick reference.",
             err=True,

@@ -39,7 +39,27 @@ def test_bare_invocation_shows_brand_wordmark():
     runner = CliRunner()
     result = runner.invoke(cli, [])
     assert result.exit_code == 0
-    assert "┌─┐" in result.output
+    assert "┌┬┐" in result.output
+
+
+def test_bare_invocation_wordmark_omits_cyber():
+    from toolchain.main import _LOGO
+
+    assert "┌─┐┬ ┬┌┐" not in _LOGO  # the dropped "cyber" block
+
+
+def test_mode_defaults_to_dark_and_is_accepted():
+    runner = CliRunner()
+    for mode in ("dark", "light", "sepia", "contrast"):
+        result = runner.invoke(cli, ["--mode", mode])
+        assert result.exit_code == 0, result.output
+
+
+def test_invalid_mode_exits_1_with_message():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--mode", "neon"])
+    assert result.exit_code == 1
+    assert "Unknown --mode" in result.output
 
 
 def test_unknown_site_flag_exits_1_with_message():

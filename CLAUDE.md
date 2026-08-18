@@ -47,6 +47,16 @@ httpx's own loggers — that's why this is a landmine and not a live bug.
 logging, either keep it off entirely or run every line through `redact()`
 first.**
 
+## Brand banner and `--mode`
+
+The bare-invocation banner (`src/toolchain/main.py`) is the brand kit's
+"toolchain" ASCII wordmark, embedded as `_LOGO` — not the "cyber" block,
+since this CLI is shared with aitoolchain. `--mode {dark,light,sepia,contrast}`
+picks which of the site's 4 theme accents colors it, sourced from
+`generator-brand/brands/cyber/brand.yaml`'s `palette.<mode>.teal`. Adding a
+5th site theme means adding its hex to `MODE_COLORS` and `VALID_MODES`
+(`config.py`) together — they must stay in sync.
+
 ## Adding a new product (a third `--site`)
 
 Add one `Site(site_base=..., api_base=...)` entry to `SITES` in

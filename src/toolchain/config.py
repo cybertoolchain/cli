@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .models import UserInputError
 
 VALID_OUTPUTS: tuple[str, ...] = ("json", "table", "csv", "tsv")
+VALID_MODES: tuple[str, ...] = ("dark", "light", "sepia", "contrast")
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class Config:
     short: bool
     timeout: float
     search_fields: str | None
+    mode: str
 
 
 def resolve_config(
@@ -61,6 +63,7 @@ def resolve_config(
     short: bool = False,
     timeout: float | None = None,
     search_fields: str | None = None,
+    mode: str | None = None,
 ) -> Config:
     """flag -> env (TOOLCHAIN_ prefix) -> default, validated once, here."""
     resolved_key = api_key or os.environ.get("TOOLCHAIN_API_KEY") or None
@@ -93,6 +96,13 @@ def resolve_config(
     if resolved_timeout <= 0:
         raise UserInputError(f"--timeout must be greater than 0, got {resolved_timeout}")
 
+    resolved_mode = mode or os.environ.get("TOOLCHAIN_MODE") or "dark"
+    if resolved_mode not in VALID_MODES:
+        supported = ", ".join(VALID_MODES)
+        raise UserInputError(
+            f"Unknown --mode '{resolved_mode}'. Supported values are: {supported}"
+        )
+
     return Config(
         api_key=resolved_key,
         site_key=resolved_site_key,
@@ -105,4 +115,5 @@ def resolve_config(
         short=short,
         timeout=resolved_timeout,
         search_fields=search_fields,
+        mode=resolved_mode,
     )
