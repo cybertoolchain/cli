@@ -142,6 +142,153 @@ def test_issues_read_no_key_renders_markdown(monkeypatch):
     assert "Nmap" in result.output
 
 
+def test_issues_head_list_matches_list_with_series_flag(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "head", "list"])
+    assert result.exit_code == 0
+    with_flag = CliRunner().invoke(cli, ["issues", "list", "--series", "head"])
+    assert json.loads(result.output) == json.loads(with_flag.output)
+
+
+def test_issues_tail_list_scopes_to_tail_only(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "tail", "list"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert all(row["issue_slug"].startswith("tail/") for row in payload)
+
+
+def test_issues_tail_get_qualifies_a_bare_issue_number(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "tail", "get", "44"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)[0]["tool"] == "Nmap"
+
+
+def test_issues_tail_get_accepts_an_already_qualified_slug(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "tail", "get", "tail/44"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)[0]["tool"] == "Nmap"
+
+
+def test_issues_series_groups_are_registered_with_help():
+    for series in ("head", "tail", "diff"):
+        result = CliRunner().invoke(cli, ["issues", series, "--help"])
+        assert result.exit_code == 0, result.output
+        assert series in result.output
+
+
+def test_issues_bare_invocation_opens_the_browser(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    class FakeApp:
+        def __init__(self, issues):
+            self.issues = issues
+
+        def run(self):
+            return None  # simulate Ctrl+C — no selection
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
+    result = CliRunner().invoke(cli, ["issues"])
+    assert result.exit_code == 0
+    assert result.output == ""
+
+
+def test_issues_bare_invocation_dedupes_rows_by_issue_slug(monkeypatch):
+    entries = load("site_entries.json")
+    captured = {}
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    class FakeApp:
+        def __init__(self, issues):
+            captured["rows"] = issues
+
+        def run(self):
+            return None
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
+    CliRunner().invoke(cli, ["issues"])
+    slugs = [row["issue_slug"] for row in captured["rows"]]
+    assert len(slugs) == len(set(slugs))
+
+
+def test_issues_series_bare_invocation_opens_a_scoped_browser(monkeypatch):
+    entries = load("site_entries.json")
+    captured = {}
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    class FakeApp:
+        def __init__(self, issues):
+            captured["rows"] = issues
+
+        def run(self):
+            return None
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
+    result = CliRunner().invoke(cli, ["issues", "tail"])
+    assert result.exit_code == 0
+    assert all(row["issue_slug"].startswith("tail/") for row in captured["rows"])
+
+
+def test_issues_browse_selection_prints_the_rendered_issue(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    class FakeApp:
+        def __init__(self, issues):
+            pass
+
+        def run(self):
+            return "tail/44"  # simulate Enter on that row
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
+    result = CliRunner().invoke(cli, ["issues"])
+    assert result.exit_code == 0
+    assert "Nmap" in result.output
+
+
 def test_issues_download_with_key_uses_v1_path(monkeypatch):
     class StubSource:
         def fetch(self, path, **params):

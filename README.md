@@ -16,6 +16,8 @@ No API key: reads the free data already published on the site.
     toolchain tools get nmap
     toolchain --limit 10 releases latest
     toolchain issues read tail/44
+    toolchain issues tail list          # just the tail series
+    toolchain issues                    # interactive browser (Ctrl+C to cancel)
     toolchain search "runtime security"
 
 With an API key (`-k`/`--api-key`, or `TOOLCHAIN_API_KEY`): live filtering,
@@ -38,7 +40,9 @@ until one ships.
 
 `-k/--api-key`, `--site`, `-o/--output` (json/table/csv/tsv), `-v/--verbose`,
 `--debug`, `-c/--cache`, `-l/--limit`, `-s/--short`, `-t/--timeout`,
-`--search-fields`. Must appear **before** the subcommand.
+`--search-fields`, `--mode` (dark/light/sepia/contrast — colors the banner,
+help menu, and JSON output to match the site's theme). Must appear
+**before** the subcommand. `toolchain help` works the same as `--help`.
 
 ## Development
 

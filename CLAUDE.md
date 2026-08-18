@@ -49,13 +49,53 @@ first.**
 
 ## Brand banner and `--mode`
 
-The bare-invocation banner (`src/toolchain/main.py`) is the brand kit's
-"toolchain" ASCII wordmark, embedded as `_LOGO` — not the "cyber" block,
-since this CLI is shared with aitoolchain. `--mode {dark,light,sepia,contrast}`
-picks which of the site's 4 theme accents colors it, sourced from
-`generator-brand/brands/cyber/brand.yaml`'s `palette.<mode>.teal`. Adding a
-5th site theme means adding its hex to `MODE_COLORS` and `VALID_MODES`
-(`config.py`) together — they must stay in sync.
+`src/toolchain/colors.py`'s `PALETTES` is the single source of truth for
+brand color, copied from `generator-brand/brands/cyber/brand.yaml`'s
+`palette.<mode>.{teal,blue,amber,magenta}` for all 4 site themes. Everything
+else derives from it: `config.VALID_MODES`, the wordmark/menu color in
+`main.py`, and the JSON syntax-highlighting palette in `output.py`. Adding a
+5th site theme means adding one row to `PALETTES` — nothing else changes.
+
+The bare-invocation banner is `render_icon()` (the brand mark, cropped from
+`cyber-toolchain-lockup-hero.png` and shipped downsampled as
+`src/toolchain/assets/icon.png`, rendered as true-color ANSI half-block art
+via Pillow) beside `_LOGO_LINES` (the "toolchain" wordmark block only — no
+"cyber", since this CLI is shared with aitoolchain), colored per `--mode`.
+The icon keeps its own baked-in brand colors; `--mode` doesn't retint it.
+
+`--mode` is `is_eager=True` with a `callback` (`cli_group.set_mode_meta`)
+that stashes the value on `ctx.meta["mode"]` *before* `ctx.obj` exists —
+needed so `--help`'s own eager callback (which fires and exits before the
+group's body runs) can still render a colored menu via
+`GlobalOptionGroup.get_help()`. If you add a new eager option that also
+needs to be help-aware, follow that same pattern; a non-eager option won't
+have run yet when `--help` fires.
+
+`--mode` also recolors `-o json` (and `-s/--short`) output via
+`output.highlight_json()` — ANSI wrapped around each token via
+`click.style`, which `click.echo` strips automatically for non-tty/piped
+output, so redirected JSON stays valid. Tests calling `format_output()`
+directly (not through `emit()`/`click.echo`) must strip it with
+`click.unstyle()` before `json.loads()` — see `tests/test_output.py`'s
+`_plain()` helper.
+
+## `issues` series subgroups and TUI
+
+`src/toolchain/groups/issues.py` factors its shared logic (`_list_data`,
+`_get_data`, `_download`, `_read`, `_browse`) out of the flat `issues
+list|get|download|read` commands so `_make_series_group()` can rebuild the
+same four commands under `issues {head,tail,diff}`, pre-scoped to that
+series — `issues tail get 44` qualifies the bare `44` to `tail/44` via
+`_qualify()`; an already-qualified slug passes through untouched. Both
+`issues` and each series group are `invoke_without_command=True`: with no
+further subcommand they call `_browse()`, which opens `IssueBrowserApp`
+(`src/toolchain/tui/issues_browse.py`) — the no-key path dedupes
+`entries.json` (one row per tool+issue) down to one row per `issue_slug`
+first, since the browser lists issues, not entries. Selecting a row prints
+that issue rendered via `tui.reader.render_issue()`, the same renderer
+`issues read` uses. Adding a 4th series means adding it to the `SERIES`
+tuple — the factory and the `--series` choice on the flat commands both
+read from it.
 
 ## Adding a new product (a third `--site`)
 
