@@ -197,3 +197,63 @@ def test_tools_examples_with_key_uses_v1_cli_path(monkeypatch):
     monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
     result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "examples", "nmap"])
     assert result.exit_code == 0
+
+
+def test_tools_stack_no_key_reads_tool_code_json(monkeypatch):
+    code = load("site_tool_code.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "toolCode.json"
+            return code
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "stack", "ADR"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["deps"]["direct"] == 73
+
+
+def test_tools_stack_no_key_unknown_tool_is_user_input_error(monkeypatch):
+    code = load("site_tool_code.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return code
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "stack", "not-a-tool"])
+    assert result.exit_code == 1
+
+
+def test_tools_stack_with_key_uses_v1_path(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools/nmap/stack"
+            return {}
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "stack", "nmap"])
+    assert result.exit_code == 0
+
+
+def test_tools_sbom_with_no_key_requires_api_key():
+    result = CliRunner().invoke(cli, ["tools", "sbom", "nmap"])
+    assert result.exit_code == 1
+    assert "requires an API key" in result.output
+
+
+def test_tools_sbom_with_key_uses_v1_path(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools/nmap/sbom"
+            return {"components": []}
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "sbom", "nmap"])
+    assert result.exit_code == 0
+
+
+def test_tools_sbom_help_states_the_key_requirement():
+    result = CliRunner().invoke(cli, ["tools", "sbom", "--help"])
+    assert "requires an API key" in result.output

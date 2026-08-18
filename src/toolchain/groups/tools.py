@@ -158,3 +158,42 @@ def tools_examples(ctx: click.Context, slug: str) -> None:
             raise UserInputError(f"No captured CLI examples for '{slug}' yet.")
         data = match
     emit(data, config)
+
+
+@tools.command("stack")
+@click.argument("slug")
+@click.pass_context
+@handle_errors
+def tools_stack(ctx: click.Context, slug: str) -> None:
+    """Language mix, dependencies, and AI-attribution stats. Free with no
+    key, from the published watchlist snapshot; live and per-request with
+    a key."""
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        data = source.fetch(f"tools/{slug}/stack")
+    else:
+        code = source.fetch("toolCode.json")
+        match = next((v for k, v in code.items() if k.lower() == slug.lower()), None)
+        if match is None:
+            raise UserInputError(f"No code/stack analysis published for '{slug}'.")
+        data = match
+    emit(data, config)
+
+
+@tools.command("sbom")
+@click.argument("slug")
+@click.pass_context
+@handle_errors
+def tools_sbom(ctx: click.Context, slug: str) -> None:
+    """The tool's software bill of materials. requires an API key — there
+    is no free equivalent published on the site."""
+    config = get_config(ctx)
+    if not config.api_key:
+        raise UserInputError(
+            "tools sbom requires an API key — get one at "
+            f"{config.site.site_base}/account (Researcher plan or higher)."
+        )
+    source = resolve_source(config)
+    data = source.fetch(f"tools/{slug}/sbom")
+    emit(data, config)

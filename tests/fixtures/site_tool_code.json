@@ -1,0 +1,25 @@
+{
+  "ADR": {
+    "ai": {
+      "assistants": ["Claude Code", "Cursor"],
+      "attributed_pct": 15.9,
+      "commits_attributed": 7,
+      "commits_total": 44,
+      "markers": []
+    },
+    "cli": {
+      "by_source": {"documented": 0, "parsed": 0},
+      "events": [],
+      "events_total": 0,
+      "flags": 0,
+      "live_flags": 0,
+      "tags_considered": 0,
+      "tags_total": 0,
+      "truncated": false
+    },
+    "deps": {
+      "direct": 73,
+      "top": [{"ecosystem": "pypi", "name": "requests"}]
+    }
+  }
+}
