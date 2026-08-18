@@ -59,3 +59,35 @@ def issues_get(ctx: click.Context, issue: str) -> None:
             )
         data = matches
     emit(data, config)
+
+
+@issues.command("download")
+@click.argument("issue")
+@click.option("--format", "fmt", required=True, type=click.Choice(["json", "html"]))
+@click.pass_context
+@handle_errors
+def issues_download(ctx: click.Context, issue: str, fmt: str) -> None:
+    """The same issue as a file — JSON, or the standalone rendered page."""
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        data = source.fetch(f"issues/{issue}/download", format=fmt)
+        emit(data, config)
+        return
+    if fmt == "json":
+        entries = source.fetch("entries.json")
+        matches = [row for row in entries if row.get("issue_slug") == issue]
+        if not matches:
+            raise UserInputError(
+                f"No public entries found for issue '{issue}'. Run 'toolchain issues list' "
+                "to see available issue slugs."
+            )
+        emit(matches, config)
+        return
+    # fmt == "html"
+    if "/" not in issue:
+        raise UserInputError(
+            f"'{issue}' isn't a full issue slug. Run 'toolchain issues list' to find one "
+            "(e.g. tail/44)."
+        )
+    click.echo(source.fetch_text(f"newsletter/{issue}"))

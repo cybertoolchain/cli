@@ -91,3 +91,53 @@ def test_issues_get_with_key_uses_v1_path(monkeypatch):
     monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
     result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "issues", "get", "044"])
     assert result.exit_code == 0
+
+
+def test_issues_download_json_no_key_matches_issues_get(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "download", "tail/44", "--format", "json"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)[0]["tool"] == "Nmap"
+
+
+def test_issues_download_html_no_key_fetches_the_rendered_page(monkeypatch):
+    class StubSource:
+        def fetch_text(self, path, **params):
+            assert path == "newsletter/tail/44"
+            return "<html>issue 44</html>"
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "download", "tail/44", "--format", "html"])
+    assert result.exit_code == 0
+    assert "<html>issue 44</html>" in result.output
+
+
+def test_issues_download_html_bare_number_is_rejected_no_key():
+    result = CliRunner().invoke(cli, ["issues", "download", "44", "--format", "html"])
+    assert result.exit_code == 1
+    assert "issues list" in result.output
+
+
+def test_issues_download_requires_format():
+    result = CliRunner().invoke(cli, ["issues", "download", "tail/44"])
+    assert result.exit_code != 0
+
+
+def test_issues_download_with_key_uses_v1_path(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "issues/044/download"
+            assert params == {"format": "json"}
+            return {"issue": "044"}
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(
+        cli, ["-k", "ctk_live_abc", "issues", "download", "044", "--format", "json"]
+    )
+    assert result.exit_code == 0
