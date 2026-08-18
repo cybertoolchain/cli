@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolchain-cli"
+version = "0.1.0"
+description = "Command-line client for The Cyber Toolchain and aitoolchain"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "httpx>=0.24",
+    "tabulate>=0.9",
+    "questionary>=2.0",
+    "textual>=0.60",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "hypothesis>=6.100"]
+
+[project.scripts]
+toolchain = "toolchain.main:main"
+
+[tool.setuptools.package-dir]
+toolchain = "src/toolchain"
+
+[tool.setuptools.package-data]
+toolchain = ["py.typed"]
