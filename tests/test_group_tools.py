@@ -116,3 +116,84 @@ def test_tools_get_with_key_uses_v1_slug_path(monkeypatch):
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["latest_release"]["version"] == "commits-2026-07-11"
+
+
+def test_tools_releases_no_key_filters_entries_by_tool(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "entries.json"
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "releases", "nmap"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload) == 2
+    assert all(row["name"] == "nmap" for row in payload)
+
+
+def test_tools_releases_with_key_uses_v1_path(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools/nmap/releases"
+            return {"releases": [], "next_cursor": None}
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "releases", "nmap"])
+    assert result.exit_code == 0
+
+
+def test_tools_api_no_key_reads_tool_apis_json(monkeypatch):
+    apis = load("site_tool_apis.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tool-apis.json"
+            return apis
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "api", "1Password"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["spec_version"] == "1.8.1"
+
+
+def test_tools_api_no_key_unknown_tool_is_user_input_error(monkeypatch):
+    apis = load("site_tool_apis.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return apis
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "api", "nmap"])
+    assert result.exit_code == 1
+    assert "no published API" in result.output
+
+
+def test_tools_examples_no_key_reads_cli_explains_json(monkeypatch):
+    explains = load("site_cli_explains.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "cli-explains.json"
+            return explains
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "examples", "Aircrack-ng"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert "t-opt-fe24a716" in payload
+
+
+def test_tools_examples_with_key_uses_v1_cli_path(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools/nmap/cli"
+            return {"examples": []}
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "examples", "nmap"])
+    assert result.exit_code == 0

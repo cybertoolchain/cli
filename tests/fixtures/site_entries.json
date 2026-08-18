@@ -1,0 +1,39 @@
+[
+  {
+    "tool": "Nmap",
+    "name": "nmap",
+    "category": "reconnaissance",
+    "summary": "Nmap gains TLS close_notify tolerance and signal propagation to child processes with `-k`.",
+    "url": "https://github.com/nmap/nmap/compare/49a85f9c3c11...115af39aacf9",
+    "published_at": "2026-08-09T22:03:18+00:00",
+    "issue_slug": "tail/44",
+    "has_command": true,
+    "version": "commits-2026-07-11",
+    "feature_bullets": ["Adds `-k` signal propagation."],
+    "breaking_changes": []
+  },
+  {
+    "tool": "Nmap",
+    "name": "nmap",
+    "category": "reconnaissance",
+    "summary": "Nmap 7.99 adds NSE script updates.",
+    "url": "https://nmap.org/changelog.html",
+    "published_at": "2026-07-20T09:00:00+00:00",
+    "issue_slug": "tail/38",
+    "has_command": false,
+    "version": "7.99",
+    "feature_bullets": ["NSE script updates."]
+  },
+  {
+    "tool": "Falco",
+    "name": "falco",
+    "category": "runtime-security",
+    "summary": "Falco 0.40.0 adds a new gRPC output plugin.",
+    "url": "https://falco.org/docs/reference/changelog/",
+    "published_at": "2026-08-05T10:00:00+00:00",
+    "issue_slug": "tail/42",
+    "has_command": false,
+    "version": "v0.40.0",
+    "feature_bullets": ["gRPC output plugin."]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "Aircrack-ng": {
+    "t-opt-fe24a716": {
+      "digest": "ac0115e69ae7e6aa",
+      "findings": "The tool exited with status 1 after printing a single error: 'Session file already exists'.",
+      "generated_at": "2026-08-02T17:42:53+00:00",
+      "inputs": "Aircrack-ng was run against a pcap slice file with -N.",
+      "model": "claude-sonnet-4-6",
+      "prompt_ver": "v1"
+    }
+  }
+}

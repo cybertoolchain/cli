@@ -93,3 +93,68 @@ def tools_get(ctx: click.Context, slug: str) -> None:
             )
         data = match
     emit(data, config)
+
+
+@tools.command("releases")
+@click.argument("slug")
+@click.option("--since", default=None)
+@click.option("--until", default=None)
+@click.option("--limit", "release_limit", type=int, default=None)
+@click.pass_context
+@handle_errors
+def tools_releases(ctx: click.Context, slug: str, since, until, release_limit) -> None:
+    """One tool's release history."""
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        params = {
+            k: v
+            for k, v in {"since": since, "until": until, "limit": release_limit}.items()
+            if v is not None
+        }
+        data = source.fetch(f"tools/{slug}/releases", **params)
+    else:
+        entries = source.fetch("entries.json")
+        data = [row for row in entries if row.get("name") == slug.lower()]
+    emit(data, config)
+
+
+@tools.command("api")
+@click.argument("slug")
+@click.pass_context
+@handle_errors
+def tools_api(ctx: click.Context, slug: str) -> None:
+    """The tool's own API surface: capability areas and endpoint count on
+    any key or none; full per-endpoint detail on a Researcher+ key."""
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        data = source.fetch(f"tools/{slug}/api")
+    else:
+        apis = source.fetch("tool-apis.json")
+        match = next((v for k, v in apis.items() if k.lower() == slug.lower()), None)
+        if match is None:
+            raise UserInputError(f"'{slug}' has no published API in the watchlist.")
+        data = match
+    emit(data, config)
+
+
+@tools.command("examples")
+@click.argument("slug")
+@click.pass_context
+@handle_errors
+def tools_examples(ctx: click.Context, slug: str) -> None:
+    """Captured command-line examples. No key: the written explanation of
+    what each captured run did. With a key: the full command and its real
+    output too."""
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        data = source.fetch(f"tools/{slug}/cli")
+    else:
+        explains = source.fetch("cli-explains.json")
+        match = next((v for k, v in explains.items() if k.lower() == slug.lower()), None)
+        if match is None:
+            raise UserInputError(f"No captured CLI examples for '{slug}' yet.")
+        data = match
+    emit(data, config)

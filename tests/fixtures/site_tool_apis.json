@@ -1,0 +1,15 @@
+{
+  "1Password": {
+    "changes": [],
+    "deprecated": [],
+    "endpoints": [
+      "GET /vaults",
+      "GET /vaults/{vaultUuid}",
+      "GET /vaults/{vaultUuid}/items",
+      "POST /vaults/{vaultUuid}/items"
+    ],
+    "spec_url": "https://i.1password.com/media/1password-connect/1password-connect-api_1.8.1.yaml",
+    "spec_version": "1.8.1",
+    "title": "1Password Connect API"
+  }
+}
