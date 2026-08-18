@@ -7,9 +7,6 @@ from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Header, Input
 
-from ..config import Config
-from ..source.base import Source
-
 
 class ToolBrowserApp(App):
     """Fuzzy search + select over the tools list. Returns the selected
@@ -25,6 +22,7 @@ class ToolBrowserApp(App):
     def __init__(self, tools: list[dict[str, Any]]) -> None:
         super().__init__()
         self._all_tools = tools
+        self._visible_rows: list[dict[str, Any]] = []
         self.selected_tool: dict[str, Any] | None = None
 
     def compose(self) -> ComposeResult:
