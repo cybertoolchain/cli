@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as _json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -11,8 +12,11 @@ class FakeResponse:
     status_code: int
     json_data: dict | None = None
     text: str = ""
+    invalid_json: bool = False
 
     def json(self) -> dict:
+        if self.invalid_json:
+            raise _json.JSONDecodeError("Expecting value", self.text or "", 0)
         return self.json_data or {}
 
 

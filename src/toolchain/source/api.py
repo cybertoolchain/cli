@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from urllib.parse import urlencode
 
@@ -21,7 +22,9 @@ class ApiSource:
     ) -> None:
         self._base = api_base.rstrip("/")
         self._key = api_key
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
+        self._client = (
+            client if client is not None else httpx.Client(timeout=timeout, follow_redirects=True)
+        )
 
     def _url(self, path: str) -> str:
         return f"{self._base}/v1/{path.lstrip('/')}"
@@ -45,7 +48,10 @@ class ApiSource:
             raise APIError("Rate limit exceeded for this key. Try again later.")
         if response.status_code >= 400:
             raise APIError(f"{response.status_code} fetching {url}")
-        return response.json()
+        try:
+            return response.json()
+        except json.JSONDecodeError as exc:
+            raise APIError(f"{url} did not return valid JSON") from exc
 
     def curl(self, path: str, **params: Any) -> str:
         url = self._url(path)

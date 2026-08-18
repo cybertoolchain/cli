@@ -55,6 +55,20 @@ def test_timeout_raises_network_error():
         source.fetch("tools")
 
 
+def test_default_client_follows_redirects():
+    source = ApiSource(BASE, "ctk_live_abc")
+    assert source._client.follow_redirects is True
+
+
+def test_fetch_with_non_json_2xx_body_raises_api_error():
+    client = FakeClient(
+        responses={f"{BASE}/v1/tools": FakeResponse(200, text="<html>oops</html>", invalid_json=True)}
+    )
+    source = ApiSource(BASE, "ctk_live_abc", client=client)
+    with pytest.raises(APIError, match="did not return valid JSON"):
+        source.fetch("tools")
+
+
 def test_curl_never_prints_the_real_key():
     source = ApiSource(BASE, "ctk_live_secret_value", client=FakeClient())
     dump = source.curl("tools/count")

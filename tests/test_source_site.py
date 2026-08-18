@@ -68,6 +68,11 @@ def test_connect_error_raises_network_error():
         source.fetch("tools.json")
 
 
+def test_default_client_follows_redirects():
+    source = SiteSource("https://cybertoolchain.github.io")
+    assert source._client.follow_redirects is True
+
+
 def test_curl_renders_a_get_url():
     source = SiteSource("https://cybertoolchain.github.io", client=FakeClient())
     assert source.curl("tools.json") == "curl https://cybertoolchain.github.io/tools.json"
@@ -78,6 +83,19 @@ def test_curl_includes_params():
     assert source.curl("entries.json", tool="nmap") == (
         "curl https://cybertoolchain.github.io/entries.json?tool=nmap"
     )
+
+
+def test_fetch_with_non_json_2xx_body_raises_api_error():
+    client = FakeClient(
+        responses={
+            "https://cybertoolchain.github.io/tools.json": FakeResponse(
+                200, text="<html>not json</html>", invalid_json=True
+            )
+        }
+    )
+    source = SiteSource("https://cybertoolchain.github.io", client=client)
+    with pytest.raises(APIError, match="did not return valid JSON"):
+        source.fetch("tools.json")
 
 
 def test_fetch_text_returns_raw_body():

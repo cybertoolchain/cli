@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from urllib.parse import urlencode
 
@@ -20,7 +21,9 @@ class SiteSource:
         client: httpx.Client | Any | None = None,
     ) -> None:
         self._base = site_base.rstrip("/")
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
+        self._client = (
+            client if client is not None else httpx.Client(timeout=timeout, follow_redirects=True)
+        )
 
     def _url(self, path: str) -> str:
         return f"{self._base}/{path.lstrip('/')}"
@@ -35,7 +38,10 @@ class SiteSource:
             raise NetworkError(f"Could not connect to {url}") from exc
         if response.status_code >= 400:
             raise APIError(f"{response.status_code} fetching {url}")
-        return response.json()
+        try:
+            return response.json()
+        except json.JSONDecodeError as exc:
+            raise APIError(f"{url} did not return valid JSON") from exc
 
     def fetch_text(self, path: str, **params: Any) -> str:
         url = self._url(path)
