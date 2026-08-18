@@ -129,6 +129,19 @@ def test_issues_download_requires_format():
     assert result.exit_code != 0
 
 
+def test_issues_read_no_key_renders_markdown(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["issues", "read", "tail/44"])
+    assert result.exit_code == 0
+    assert "Nmap" in result.output
+
+
 def test_issues_download_with_key_uses_v1_path(monkeypatch):
     class StubSource:
         def fetch(self, path, **params):

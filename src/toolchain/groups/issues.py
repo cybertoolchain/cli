@@ -91,3 +91,29 @@ def issues_download(ctx: click.Context, issue: str, fmt: str) -> None:
             "(e.g. tail/44)."
         )
     click.echo(source.fetch_text(f"newsletter/{issue}"))
+
+
+@issues.command("read")
+@click.argument("issue")
+@click.pass_context
+@handle_errors
+def issues_read(ctx: click.Context, issue: str) -> None:
+    """Read an issue as a rendered document — Markdown with syntax
+    highlighting, not raw JSON. Human-only: does not go through
+    -o/--output. Pipe to a pager, e.g. `toolchain issues read tail/44 | less -R`."""
+    from ..tui.reader import render_issue
+
+    config = get_config(ctx)
+    source = resolve_source(config)
+    if config.api_key:
+        data = source.fetch(f"issues/{issue}")
+        entries = data.get("entries", [])
+    else:
+        entries_data = source.fetch("entries.json")
+        entries = [row for row in entries_data if row.get("issue_slug") == issue]
+        if not entries:
+            raise UserInputError(
+                f"No public entries found for issue '{issue}'. Run 'toolchain issues list' "
+                "to see available issue slugs."
+            )
+    click.echo(render_issue(entries))
