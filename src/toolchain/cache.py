@@ -35,12 +35,13 @@ class CachingSource:
     this exact (path, params), else delegates and caches the result. Makes
     -c/--cache actually do something — see resolve_source in Task 8."""
 
-    def __init__(self, inner: Any, cache: Cache) -> None:
+    def __init__(self, inner: Any, cache: Cache, *, namespace: str = "") -> None:
         self._inner = inner
         self._cache = cache
+        self._namespace = namespace
 
     def _key(self, path: str, params: dict) -> str:
-        return f"{path}:{sorted(params.items())}"
+        return f"{self._namespace}:{path}:{sorted(params.items())}"
 
     def fetch(self, path: str, **params) -> dict:
         key = self._key(path, params)

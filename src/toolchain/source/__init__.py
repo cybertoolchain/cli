@@ -1,6 +1,7 @@
 # src/toolchain/source/__init__.py
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from ..cache import Cache, CachingSource
@@ -34,5 +35,14 @@ def resolve_source(config: Config) -> Source:
         source = SiteSource(config.site.site_base, timeout=config.timeout)
 
     if config.cache:
-        return CachingSource(source, Cache(CACHE_DIR))
+        # Namespaced by site + API-key tier so two products, or a free vs.
+        # keyed response for the "same" path/params, never share a cache
+        # entry. Never store the raw key — only a short digest of it.
+        key_digest = (
+            hashlib.sha256(config.api_key.encode("utf-8")).hexdigest()[:16]
+            if config.api_key
+            else "no-key"
+        )
+        namespace = f"{config.site_key}:{key_digest}"
+        return CachingSource(source, Cache(CACHE_DIR), namespace=namespace)
     return source

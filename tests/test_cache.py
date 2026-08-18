@@ -60,3 +60,30 @@ def test_caching_source_treats_different_params_as_different_keys(tmp_path):
     a = source.fetch("tools", category="cli")
     b = source.fetch("tools", category="service")
     assert a != b
+
+
+def test_caching_source_namespaces_keys_so_different_sites_or_keys_do_not_collide(tmp_path):
+    from toolchain.cache import CachingSource
+
+    class FixedSource:
+        def __init__(self, value):
+            self.calls = 0
+            self._value = value
+
+        def fetch(self, path, **params):
+            self.calls += 1
+            return self._value
+
+    shared_cache = Cache(tmp_path)
+    inner_a = FixedSource({"product": "cybertoolchain"})
+    inner_b = FixedSource({"product": "aitoolchain"})
+    source_a = CachingSource(inner_a, shared_cache, namespace="cybertoolchain:no-key")
+    source_b = CachingSource(inner_b, shared_cache, namespace="aitoolchain:no-key")
+
+    # Prime source_a's cache entry for this exact (path, params) first.
+    assert source_a.fetch("tools.json") == {"product": "cybertoolchain"}
+    # Same path+params under a different namespace must be a fresh miss,
+    # not source_a's cached response served back under a different name.
+    assert source_b.fetch("tools.json") == {"product": "aitoolchain"}
+    assert inner_a.calls == 1
+    assert inner_b.calls == 1
