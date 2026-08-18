@@ -1,6 +1,7 @@
 # tests/test_main.py
 from __future__ import annotations
 
+import click
 from click.testing import CliRunner
 
 from toolchain.main import cli
@@ -51,10 +52,35 @@ def test_bare_invocation_wordmark_omits_cyber():
 def test_render_icon_produces_half_block_art():
     from toolchain.main import render_icon
 
-    icon = render_icon()
+    icon = render_icon("dark")
     lines = icon.split("\n")
     assert len(lines) == 14  # 28px asset, 2 rows per half-block character
     assert any("▀" in line or "▄" in line for line in lines)
+
+
+def test_render_icon_recolors_per_mode():
+    from toolchain.main import render_icon
+
+    dark = render_icon("dark")
+    contrast = render_icon("contrast")
+    assert dark != contrast
+
+
+def test_render_tldr_colors_the_command_examples():
+    from toolchain.main import render_tldr
+
+    dark = render_tldr("dark")
+    contrast = render_tldr("contrast")
+    assert dark != contrast
+    assert "toolchain tools list" in click.unstyle(dark)
+
+
+def test_tldr_command_is_colored_by_mode():
+    runner = CliRunner()
+    sepia = runner.invoke(cli, ["--mode", "sepia", "tldr"], color=True)
+    contrast = runner.invoke(cli, ["--mode", "contrast", "tldr"], color=True)
+    assert sepia.output != contrast.output
+    assert click.unstyle(sepia.output) == click.unstyle(contrast.output)
 
 
 def test_render_banner_places_icon_beside_the_wordmark():

@@ -21,13 +21,31 @@ _LOGO_LINES = (
 )
 
 
-def render_icon() -> str:
+# The icon asset's own two baked-in colors (sampled directly from its
+# pixels): a dark-ink background and a teal glyph that happens to be
+# exactly PALETTES["dark"]["teal"]. render_icon() projects every opaque
+# pixel onto the bg->teal axis to get a 0..1 "how teal is this" mix ratio,
+# then re-renders it as bg->PALETTES[mode]["teal"] — so the glyph retints
+# per --mode while the dark background (not a themed hue) stays put.
+_ICON_BG = (7, 14, 15)
+_ICON_TEAL = (52, 226, 212)
+
+
+def _recolor(rgb: tuple[int, int, int], mode: str) -> tuple[int, int, int]:
+    target = PALETTES[mode]["teal"]
+    axis = tuple(b - a for a, b in zip(_ICON_BG, _ICON_TEAL))
+    denom = sum(component * component for component in axis)
+    t = sum((p - a) * d for p, a, d in zip(rgb, _ICON_BG, axis)) / denom
+    t = max(0.0, min(1.0, t))
+    return tuple(round(a + t * (b - a)) for a, b in zip(_ICON_BG, target))
+
+
+def render_icon(mode: str) -> str:
     """The brand mark (cyber-toolchain-lockup-hero.png's icon, cropped to
     its rounded-square glyph and downsampled to 28x28) as true-color ANSI
-    half-block art — packaged as src/toolchain/assets/icon.png rather than
-    read from the sibling site repo, since a customer running this CLI
-    won't have it checked out. Uses the asset's own brand colors; unlike
-    the wordmark, this doesn't recolor per --mode."""
+    half-block art, retinted per --mode via _recolor() — packaged as
+    src/toolchain/assets/icon.png rather than read from the sibling site
+    repo, since a customer running this CLI won't have it checked out."""
     from importlib import resources
 
     from PIL import Image
@@ -49,18 +67,20 @@ def render_icon() -> str:
             if not top_on and not bottom_on:
                 cells.append(" ")
             elif top_on and bottom_on:
-                cells.append(click.style("▀", fg=top[:3], bg=bottom[:3]))
+                cells.append(
+                    click.style("▀", fg=_recolor(top[:3], mode), bg=_recolor(bottom[:3], mode))
+                )
             elif top_on:
-                cells.append(click.style("▀", fg=top[:3]))
+                cells.append(click.style("▀", fg=_recolor(top[:3], mode)))
             else:
-                cells.append(click.style("▄", fg=bottom[:3]))
+                cells.append(click.style("▄", fg=_recolor(bottom[:3], mode)))
         lines.append("".join(cells))
     return "\n".join(lines)
 
 
 def render_banner(mode: str) -> str:
     color = PALETTES[mode]["teal"]
-    icon_lines = render_icon().split("\n")
+    icon_lines = render_icon(mode).split("\n")
     word_lines = [click.style(line, fg=color, bold=True) for line in _LOGO_LINES]
 
     top_pad = (len(icon_lines) - len(word_lines)) // 2
@@ -70,6 +90,7 @@ def render_banner(mode: str) -> str:
         word_line = word_lines[word_idx] if 0 <= word_idx < len(word_lines) else ""
         rows.append(f"{icon_line}  {word_line}")
     return "\n" + "\n".join(rows) + "\n"
+
 
 TLDR = """\
 toolchain tools list                    # every tracked tool
@@ -84,6 +105,18 @@ Add -k/--api-key (or set TOOLCHAIN_API_KEY) for live filtering, full
 analytics, SBOM, and stack details. Run 'toolchain COMMAND --help' for
 every option.
 """
+
+
+def render_tldr(mode: str) -> str:
+    color = PALETTES[mode]["teal"]
+    lines = []
+    for line in TLDR.split("\n"):
+        if line.lstrip().startswith("toolchain") and "#" in line:
+            command, hash_sign, comment = line.partition("#")
+            lines.append(click.style(command, fg=color, bold=True) + hash_sign + comment)
+        else:
+            lines.append(line)
+    return "\n".join(lines)
 
 
 @click.group(cls=GlobalOptionGroup, invoke_without_command=True)
@@ -150,9 +183,10 @@ def cli(
 
 
 @cli.command()
-def tldr() -> None:
+@click.pass_context
+def tldr(ctx: click.Context) -> None:
     """Quick reference for common commands."""
-    click.echo(TLDR)
+    click.echo(render_tldr(ctx.obj.mode))
 
 
 @cli.command("help")
