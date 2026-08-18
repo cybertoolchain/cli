@@ -101,6 +101,10 @@ from .groups.categories import categories as categories_group
 
 cli.add_command(categories_group, name="categories")
 
+from .groups.issues import issues as issues_group
+
+cli.add_command(issues_group, name="issues")
+
 
 def main() -> None:
     try:
