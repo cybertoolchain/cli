@@ -6,6 +6,7 @@ import json
 from hypothesis import given
 from hypothesis import strategies as st
 
+from toolchain.models import UserInputError
 from toolchain.output import extract_items, format_output
 
 TOOLS_RESPONSE = {
@@ -48,11 +49,18 @@ def test_table_renders_a_grid_with_headers():
     assert "Falco" in out
 
 
-def test_table_with_no_list_raises_value_error():
+def test_table_with_no_list_raises_user_input_error():
     import pytest
 
-    with pytest.raises(ValueError, match="no list of records"):
+    with pytest.raises(UserInputError, match="no list of records"):
         format_output({"total": 2}, fmt="table")
+
+
+def test_table_on_a_single_record_raises_user_input_error_not_bare_value_error():
+    import pytest
+
+    with pytest.raises(UserInputError, match="try -o json instead"):
+        format_output({"name": "Nmap"}, fmt="table")
 
 
 def test_csv_has_a_header_row_and_one_row_per_item():
@@ -71,6 +79,21 @@ def test_tsv_uses_tab_delimiter():
 def test_limit_truncates_the_item_list():
     out = format_output(TOOLS_RESPONSE, fmt="json", limit=1)
     assert len(json.loads(out)["tools"]) == 1
+
+
+def test_limit_only_truncates_the_actual_target_list_when_nested_under_another_key():
+    # 'notes' is an unrelated top-level list-of-dicts. The real target list
+    # (larger, so extract_items picks it) is nested one level deeper, under
+    # a DIFFERENT key ('series' -> 'rows'). Truncating must not touch
+    # 'notes' at all, and must actually truncate 'series.rows'.
+    data = {
+        "notes": [{"a": 1}],
+        "series": {"rows": [{"x": 1}, {"x": 2}, {"x": 3}]},
+    }
+    out = format_output(data, fmt="json", limit=1)
+    result = json.loads(out)
+    assert result["notes"] == [{"a": 1}]
+    assert result["series"]["rows"] == [{"x": 1}]
 
 
 def test_short_gives_one_json_line_per_row():

@@ -1,12 +1,15 @@
 # src/toolchain/output.py
 from __future__ import annotations
 
+import copy
 import csv
 import io
 import json
 from typing import Any
 
 from tabulate import tabulate
+
+from .models import UserInputError
 
 _PRIORITY_FIELDS = ("name", "tool", "display", "status", "severity", "category")
 _DEEMPHASIZE_SUFFIXES = ("id", "uuid", "url", "href")
@@ -32,6 +35,25 @@ def extract_items(data: Any) -> list[dict] | None:
     if not candidates:
         return None
     return max(candidates, key=len)
+
+
+def _find_path(node: Any, target: list, path: tuple = ()) -> tuple | None:
+    """Where `target` (the exact list object extract_items found, matched
+    by identity) actually lives inside `node` — a sequence of dict keys
+    and/or list indices from `node` down to it. None if not found."""
+    if node is target:
+        return path
+    if isinstance(node, dict):
+        for key, value in node.items():
+            found = _find_path(value, target, path + (key,))
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found = _find_path(value, target, path + (index,))
+            if found is not None:
+                return found
+    return None
 
 
 def _priority_key(field: str) -> tuple[int, int, str]:
@@ -77,15 +99,24 @@ def format_output(
 
     items = extract_items(data)
     if items is not None and limit is not None:
-        items = items[:limit]
-        if isinstance(data, dict):
-            data = {**data}
-            for key, value in list(data.items()):
-                if isinstance(value, list) and value and all(isinstance(x, dict) for x in value):
-                    data[key] = items
-                    break
+        truncated = items[:limit]
+        path = _find_path(data, items)
+        if path is None or path == ():
+            # Either items came from nowhere findable (shouldn't happen,
+            # since extract_items just pulled it from data) or data IS the
+            # target list itself — either way, the truncated list is the
+            # whole new response.
+            data = truncated
         else:
-            data = items
+            # Deep-copy first, THEN walk the recorded path into the copy —
+            # walking the ORIGINAL data and mutating in place would corrupt
+            # the `items` reference other code below still reads.
+            data = copy.deepcopy(data)
+            container = data
+            for key in path[:-1]:
+                container = container[key]
+            container[path[-1]] = truncated
+        items = truncated
 
     if short:
         rows = items if items is not None else ([data] if isinstance(data, dict) else [])
@@ -95,7 +126,10 @@ def format_output(
         return json.dumps(data, indent=2)
 
     if items is None:
-        raise ValueError(f"Cannot render {fmt} output: no list of records found in the response")
+        raise UserInputError(
+            f"Cannot render {fmt} output: this response has no list of records "
+            "(try -o json instead)"
+        )
 
     if fmt == "table":
         return tabulate(items, headers="keys", tablefmt="grid")
