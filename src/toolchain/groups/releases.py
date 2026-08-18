@@ -17,11 +17,12 @@ def releases() -> None:
 @click.option("--categories", default=None, help="Comma-separated taxonomy slugs.")
 @click.option("--since", default=None)
 @click.option("--until", default=None)
-@click.option("--limit", "list_limit", type=int, default=None)
 @click.pass_context
 @handle_errors
-def releases_list(ctx: click.Context, tools_, categories, since, until, list_limit) -> None:
-    """Filterable across the whole watchlist, not just one tool."""
+def releases_list(ctx: click.Context, tools_, categories, since, until) -> None:
+    """Filterable across the whole watchlist, not just one tool. Use the
+    GLOBAL -l/--limit (before the subcommand) to cap how many come back —
+    there is no separate --limit here."""
     config = get_config(ctx)
     source = resolve_source(config)
     if config.api_key:
@@ -32,7 +33,7 @@ def releases_list(ctx: click.Context, tools_, categories, since, until, list_lim
                 "categories": categories,
                 "since": since,
                 "until": until,
-                "limit": list_limit,
+                "limit": config.limit,
             }.items()
             if v is not None
         }
@@ -50,23 +51,25 @@ def releases_list(ctx: click.Context, tools_, categories, since, until, list_lim
             data = [row for row in data if row.get("published_at", "") >= since]
         if until:
             data = [row for row in data if row.get("published_at", "") <= until]
-        if list_limit is not None:
-            data = data[:list_limit]
+        if config.limit is not None:
+            data = data[: config.limit]
     emit(data, config)
 
 
 @releases.command("latest")
-@click.option("--limit", "releases_limit", type=int, default=20)
 @click.pass_context
 @handle_errors
-def releases_latest(ctx: click.Context, releases_limit: int) -> None:
+def releases_latest(ctx: click.Context) -> None:
     """Newest releases across the whole watchlist, no filters — the CLI
-    equivalent of the Tail newsletter feed."""
+    equivalent of the Tail newsletter feed. Use the GLOBAL -l/--limit
+    (before the subcommand) to change the default of 20 — there is no
+    separate --limit here."""
     config = get_config(ctx)
+    limit = config.limit if config.limit is not None else 20
     source = resolve_source(config)
     if config.api_key:
-        data = source.fetch("releases", limit=releases_limit)
+        data = source.fetch("releases", limit=limit)
     else:
         entries = source.fetch("entries.json")
-        data = sorted(entries, key=lambda row: row.get("published_at", ""), reverse=True)[:releases_limit]
+        data = sorted(entries, key=lambda row: row.get("published_at", ""), reverse=True)[:limit]
     emit(data, config)

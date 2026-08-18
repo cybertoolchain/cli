@@ -84,6 +84,11 @@ def test_releases_latest_sorts_newest_first_and_applies_default_limit(monkeypatc
 
 
 def test_releases_latest_limit_flag(monkeypatch):
+    # --limit is the GLOBAL flag (Task 3/12) — there is no per-command
+    # --limit anywhere in this CLI, precisely to avoid colliding with it
+    # under GlobalOptionGroup (see Task 11's ledger: a bare "--limit" after
+    # the subcommand is indistinguishable from a misplaced global flag).
+    # So it goes BEFORE the subcommand here, like every other global flag.
     entries = load("site_entries.json")
 
     class StubSource:
@@ -91,6 +96,19 @@ def test_releases_latest_limit_flag(monkeypatch):
             return entries
 
     monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
-    result = CliRunner().invoke(cli, ["releases", "latest", "--limit", "1"])
+    result = CliRunner().invoke(cli, ["--limit", "1", "releases", "latest"])
     assert result.exit_code == 0
     assert len(json.loads(result.output)) == 1
+
+
+def test_releases_list_limit_flag(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["--limit", "2", "releases", "list"])
+    assert result.exit_code == 0
+    assert len(json.loads(result.output)) == 2

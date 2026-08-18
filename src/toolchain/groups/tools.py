@@ -99,23 +99,24 @@ def tools_get(ctx: click.Context, slug: str) -> None:
 @click.argument("slug")
 @click.option("--since", default=None)
 @click.option("--until", default=None)
-@click.option("--limit", "release_limit", type=int, default=None)
 @click.pass_context
 @handle_errors
-def tools_releases(ctx: click.Context, slug: str, since, until, release_limit) -> None:
+def tools_releases(ctx: click.Context, slug: str, since, until) -> None:
     """One tool's release history."""
     config = get_config(ctx)
     source = resolve_source(config)
     if config.api_key:
         params = {
             k: v
-            for k, v in {"since": since, "until": until, "limit": release_limit}.items()
+            for k, v in {"since": since, "until": until, "limit": config.limit}.items()
             if v is not None
         }
         data = source.fetch(f"tools/{slug}/releases", **params)
     else:
         entries = source.fetch("entries.json")
         data = [row for row in entries if row.get("name") == slug.lower()]
+        if config.limit is not None:
+            data = data[: config.limit]
     emit(data, config)
 
 
