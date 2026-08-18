@@ -1,0 +1,5 @@
+[
+  {"type": "tool", "label": "Nmap", "sub": "reconnaissance", "href": "/tools/nmap", "keywords": "nmap network scanning port scanner reconnaissance"},
+  {"type": "tool", "label": "Falco", "sub": "runtime-security", "href": "/tools/falco", "keywords": "falco ebpf runtime detection kubernetes"},
+  {"type": "issue", "label": "Issue 44", "sub": "issue", "href": "/newsletter/44", "keywords": "issue 44 nmap falco"}
+]

@@ -109,6 +109,10 @@ from .groups.analytics import analytics as analytics_group
 
 cli.add_command(analytics_group, name="analytics")
 
+from .groups.search import search as search_command
+
+cli.add_command(search_command, name="search")
+
 
 def main() -> None:
     try:
