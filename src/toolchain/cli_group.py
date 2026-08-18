@@ -50,13 +50,25 @@ class GlobalOptionGroup(click.Group):
             break
 
         if sub_idx is not None:
-            for token in args[sub_idx + 1 :]:
+            j = sub_idx + 1
+            while j < len(args):
+                token = args[j]
                 name = token.split("=", 1)[0]
                 if name in GLOBAL_FLAGS:
+                    has_inline_value = "=" in token
+                    consumes_next = name in _VALUE_FLAGS and not has_inline_value
+                    # Everything the user actually typed, minus this
+                    # misplaced flag (and its separate value token, if it
+                    # had one) — the full path, not just up to the first
+                    # subcommand word.
+                    remainder = args[:j] + args[j + (2 if consumes_next else 1) :]
+                    corrected_flag = f"{name} <value>" if name in _VALUE_FLAGS else name
+                    example = f"toolchain {corrected_flag} {' '.join(remainder)}".rstrip()
                     raise click.UsageError(
                         f"'{name}' is a global option and must appear before the subcommand.\n\n"
                         "  toolchain [GLOBAL OPTIONS] GROUP COMMAND ...\n\n"
                         "Example:\n"
-                        f"  toolchain {name} <value> {' '.join(args[:sub_idx + 1])}"
+                        f"  {example}"
                     )
+                j += 1
         return super().parse_args(ctx, args)

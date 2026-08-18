@@ -43,7 +43,22 @@ def test_global_flag_after_subcommand_is_rejected():
 def test_error_message_shows_a_corrective_example():
     runner = CliRunner()
     result = runner.invoke(_build_test_cli(), ["tools", "list", "-o", "json"])
-    assert "toolchain -o <value> tools list" in result.output or "-o <value>" in result.output
+    assert "toolchain -o <value> tools list" in result.output
+
+
+def test_error_message_keeps_the_full_nested_subcommand_path():
+    # Regression: args[:sub_idx + 1] used to only include tokens up to the
+    # FIRST subcommand token, dropping "list" here.
+    runner = CliRunner()
+    result = runner.invoke(_build_test_cli(), ["tools", "list", "extra-arg", "-o", "json"])
+    assert "toolchain -o <value> tools list extra-arg" in result.output
+
+
+def test_error_message_omits_value_placeholder_for_boolean_flags():
+    runner = CliRunner()
+    result = runner.invoke(_build_test_cli(), ["tools", "list", "-v"])
+    assert "toolchain -v tools list" in result.output
+    assert "-v <value>" not in result.output
 
 
 def test_unrelated_subcommand_option_is_unaffected():
