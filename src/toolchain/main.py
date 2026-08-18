@@ -21,7 +21,7 @@ BANNER = r"""
 TLDR = """\
 toolchain tools list                    # every tracked tool
 toolchain tools get nmap                # one tool + its latest release
-toolchain releases latest --limit 10    # what just shipped, across the watchlist
+toolchain --limit 10 releases latest    # what just shipped, across the watchlist
 toolchain issues get 044                # one newsletter issue, as data
 toolchain issues read 044               # ...and as a rendered document
 toolchain search "runtime security"     # tools + releases matching a query
