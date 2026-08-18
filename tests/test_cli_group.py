@@ -10,7 +10,8 @@ from toolchain.cli_group import GlobalOptionGroup
 def _build_test_cli():
     @click.group(cls=GlobalOptionGroup)
     @click.option("-o", "--output", default="json")
-    def root(output):
+    @click.option("-v", "--verbose", is_flag=True, default=False)
+    def root(output, verbose):
         pass
 
     @root.group()
@@ -49,3 +50,13 @@ def test_unrelated_subcommand_option_is_unaffected():
     runner = CliRunner()
     result = runner.invoke(_build_test_cli(), ["tools", "list"])
     assert result.exit_code == 0
+
+
+def test_two_correctly_placed_global_flags_are_not_rejected():
+    # Regression test: a naive "first token not starting with -" boundary
+    # search lands on "json" (the VALUE of -o) instead of "tools", and then
+    # wrongly flags the still-correctly-placed -v as misplaced.
+    runner = CliRunner()
+    result = runner.invoke(_build_test_cli(), ["-o", "json", "-v", "tools", "list"])
+    assert result.exit_code == 0
+    assert "ok" in result.output
