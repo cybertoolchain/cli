@@ -32,3 +32,11 @@ def test_unknown_site_flag_exits_1_with_message():
     result = runner.invoke(cli, ["--site", "not-real", "tldr"])
     assert result.exit_code == 1
     assert "Unknown --site" in result.output
+
+
+def test_tools_group_is_registered():
+    from click.testing import CliRunner
+
+    result = CliRunner().invoke(cli, ["tools", "--help"])
+    assert result.exit_code == 0
+    assert "list" in result.output

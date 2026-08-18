@@ -1,0 +1,22 @@
+{
+  "tools": [
+    {
+      "name": "Nmap", "display": "Nmap", "category": "reconnaissance", "vendor": null,
+      "tool_type": "cli", "tags": ["network-scanning", "port-scanning", "service-detection", "os-fingerprinting"],
+      "repo": "nmap/nmap", "url": null, "docs_url": "https://nmap.org/book/man.html",
+      "changelog_url": "https://nmap.org/changelog.html", "website": null, "adapter": "github",
+      "open_source": null, "license": "oss", "launched": null, "added": "2026-06-24",
+      "retired": false, "slug": "nmap"
+    },
+    {
+      "name": "Falco", "display": "Falco", "category": "runtime-security", "vendor": null,
+      "tool_type": "service", "tags": ["ebpf", "runtime-detection", "syscall-monitoring", "kubernetes"],
+      "repo": "falcosecurity/falco", "url": null, "docs_url": "https://falco.org/docs/",
+      "changelog_url": "https://falco.org/docs/reference/changelog/", "website": null, "adapter": "github",
+      "open_source": null, "license": "oss", "launched": null, "added": "2026-07-02",
+      "retired": false, "slug": "falco"
+    }
+  ],
+  "total": 2,
+  "next_cursor": null
+}

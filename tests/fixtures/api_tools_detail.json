@@ -1,0 +1,23 @@
+{
+  "name": "Nmap", "display": "Nmap", "category": "reconnaissance", "vendor": null,
+  "tool_type": "cli", "tags": ["network-scanning", "port-scanning", "service-detection", "os-fingerprinting"],
+  "repo": "nmap/nmap", "url": null, "docs_url": "https://nmap.org/book/man.html",
+  "changelog_url": "https://nmap.org/changelog.html", "website": null, "adapter": "github",
+  "open_source": null, "license": "oss", "launched": null, "added": "2026-06-24",
+  "retired": false, "slug": "nmap",
+  "latest_release": {
+    "tool": "Nmap", "category": "reconnaissance", "version": "commits-2026-07-11",
+    "published_at": "2026-08-09T22:03:18+00:00",
+    "url": "https://github.com/nmap/nmap/compare/49a85f9c3c11...115af39aacf9",
+    "summary": "Nmap gains TLS close_notify tolerance, SSL service portrule coverage, and signal propagation to child processes with `-k`.",
+    "feature_bullets": ["Adds `-k` signal propagation."],
+    "breaking_changes": [],
+    "usage_examples": [{
+      "description": "Specify an interface with -e to bind both the outgoing interface and the source address.",
+      "command": "nmap -e eth1 -S 192.168.1.50 <target>", "language": "", "kind": "shell"
+    }],
+    "signal_kind": "activity", "prerelease": false, "is_latest": false
+  },
+  "has_api_surface": false,
+  "has_cli_surface": true
+}

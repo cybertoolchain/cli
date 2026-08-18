@@ -89,6 +89,11 @@ def tldr() -> None:
     click.echo(TLDR)
 
 
+from .groups.tools import tools as tools_group
+
+cli.add_command(tools_group, name="tools")
+
+
 def main() -> None:
     try:
         cli(standalone_mode=False)
