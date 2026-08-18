@@ -412,7 +412,7 @@ git commit -m "feat: config resolution and the cybertoolchain/aitoolchain site r
 - Test: `tests/test_cache.py`
 
 **Interfaces:**
-- Produces: `Cache` class with `.get(key: str) -> dict | None` and `.set(key: str, value: dict) -> None`, backed by JSON files under a directory passed to the constructor (no `platformdirs` dependency — caller decides the directory; `main.py` will pass a real one in Task 12).
+- Produces: `Cache` class with `.get(key: str) -> dict | None` and `.set(key: str, value: dict) -> None`, backed by JSON files under a directory passed to the constructor (no `platformdirs` dependency — caller decides the directory). Also produces `CachingSource(inner: Source, cache: Cache)` — a `Source` that wraps another `Source`, checking the cache before delegating to `inner.fetch()` and writing the result back. Task 8 wires this into `resolve_source` so `-c/--cache` actually does something; without that wiring the flag would be a silent no-op (found in the plan's own preflight scan).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -448,6 +448,38 @@ def test_key_with_path_separators_is_safe(tmp_path):
     assert cache.get("tools/get/../../etc/passwd") == {"x": 1}
     # Nothing escaped the cache directory.
     assert all(p.parent == tmp_path for p in tmp_path.glob("*.json"))
+
+
+def test_caching_source_serves_from_cache_on_second_call(tmp_path):
+    from toolchain.cache import CachingSource
+
+    class CountingSource:
+        def __init__(self):
+            self.calls = 0
+
+        def fetch(self, path, **params):
+            self.calls += 1
+            return {"n": self.calls}
+
+    inner = CountingSource()
+    source = CachingSource(inner, Cache(tmp_path))
+    first = source.fetch("tools.json")
+    second = source.fetch("tools.json")
+    assert first == second == {"n": 1}
+    assert inner.calls == 1
+
+
+def test_caching_source_treats_different_params_as_different_keys(tmp_path):
+    from toolchain.cache import CachingSource
+
+    class EchoSource:
+        def fetch(self, path, **params):
+            return {"path": path, "params": params}
+
+    source = CachingSource(EchoSource(), Cache(tmp_path))
+    a = source.fetch("tools", category="cli")
+    b = source.fetch("tools", category="service")
+    assert a != b
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -488,18 +520,45 @@ class Cache:
 
     def set(self, key: str, value: dict) -> None:
         self._path(key).write_text(json.dumps(value))
+
+
+class CachingSource:
+    """Wraps another Source: serves a cached response when one exists for
+    this exact (path, params), else delegates and caches the result. Makes
+    -c/--cache actually do something — see resolve_source in Task 8."""
+
+    def __init__(self, inner: "Any", cache: Cache) -> None:
+        self._inner = inner
+        self._cache = cache
+
+    def _key(self, path: str, params: dict) -> str:
+        return f"{path}:{sorted(params.items())}"
+
+    def fetch(self, path: str, **params) -> dict:
+        key = self._key(path, params)
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        result = self._inner.fetch(path, **params)
+        self._cache.set(key, result)
+        return result
+
+    def curl(self, path: str, **params) -> str:
+        return self._inner.curl(path, **params)
 ```
+
+Add `from typing import Any` to the top of `cache.py`'s imports.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_cache.py -v`
-Expected: PASS (4 passed).
+Expected: PASS (6 passed).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/toolchain/cache.py tests/test_cache.py
-git commit -m "feat: local response cache for -c/--cache"
+git commit -m "feat: local response cache and CachingSource wrapper for -c/--cache"
 ```
 
 ---
@@ -1011,8 +1070,8 @@ git commit -m "feat: ApiSource for the keyed /v1 data API"
 - Test: `tests/test_source_resolve.py`
 
 **Interfaces:**
-- Consumes: `Config` (Task 3), `SiteSource`/`ApiSource` (Tasks 6–7), `UserInputError` (Task 2).
-- Produces: `resolve_source(config: Config) -> Source` — the one place that decides SiteSource vs. ApiSource. Every command group (Tasks 13+) calls this and nothing else to get its data source.
+- Consumes: `Config` (Task 3), `SiteSource`/`ApiSource` (Tasks 6–7), `UserInputError` (Task 2), `Cache`/`CachingSource` (Task 4).
+- Produces: `resolve_source(config: Config) -> Source` — the one place that decides SiteSource vs. ApiSource, and whether the result is wrapped in `CachingSource` for `-c/--cache`. Every command group (Tasks 13+) calls this and nothing else to get its data source.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1049,6 +1108,21 @@ def test_no_key_against_aitoolchain_still_gives_site_source():
     config = resolve_config(site="aitoolchain")
     source = resolve_source(config)
     assert isinstance(source, SiteSource)
+
+
+def test_cache_flag_wraps_the_source_in_caching_source(tmp_path, monkeypatch):
+    from toolchain.cache import CachingSource
+
+    monkeypatch.setattr("toolchain.source.CACHE_DIR", tmp_path)
+    config = resolve_config(cache=True)
+    source = resolve_source(config)
+    assert isinstance(source, CachingSource)
+
+
+def test_no_cache_flag_returns_the_source_directly():
+    config = resolve_config(cache=False)
+    source = resolve_source(config)
+    assert isinstance(source, SiteSource)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1062,40 +1136,53 @@ Expected: FAIL with `ImportError: cannot import name 'resolve_source'`.
 # src/toolchain/source/__init__.py
 from __future__ import annotations
 
+from pathlib import Path
+
+from ..cache import Cache, CachingSource
 from ..config import Config
 from ..models import UserInputError
 from .api import ApiSource
 from .base import Source
 from .site import SiteSource
 
-__all__ = ["Source", "SiteSource", "ApiSource", "resolve_source"]
+__all__ = ["Source", "SiteSource", "ApiSource", "resolve_source", "CACHE_DIR"]
+
+#: Module-level so tests can monkeypatch it (see test_source_resolve.py) to
+#: point at a tmp_path instead of the real home directory.
+CACHE_DIR = Path.home() / ".cache" / "toolchain"
 
 
 def resolve_source(config: Config) -> Source:
     """The one decision point: no key -> the free static site; a key -> the
     live, versioned data API. Also the one place that catches "this product
     has no data API yet" before a command gets a confusing connection
-    failure against a None base URL."""
+    failure against a None base URL, and that wraps the result in
+    CachingSource when -c/--cache is set."""
     if config.api_key:
         if config.site.api_base is None:
             raise UserInputError(
                 f"{config.site_key} has no data API yet — only the free site "
                 "data is available for it."
             )
-        return ApiSource(config.site.api_base, config.api_key, timeout=config.timeout)
-    return SiteSource(config.site.site_base, timeout=config.timeout)
+        source: Source = ApiSource(config.site.api_base, config.api_key, timeout=config.timeout)
+    else:
+        source = SiteSource(config.site.site_base, timeout=config.timeout)
+
+    if config.cache:
+        return CachingSource(source, Cache(CACHE_DIR))
+    return source
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_source_resolve.py -v`
-Expected: PASS (4 passed).
+Expected: PASS (6 passed).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/toolchain/source/__init__.py tests/test_source_resolve.py
-git commit -m "feat: resolve_source picks SiteSource or ApiSource from config"
+git commit -m "feat: resolve_source picks SiteSource/ApiSource and wires -c/--cache"
 ```
 
 ---
@@ -2644,6 +2731,7 @@ git commit -m "feat: tools stack (free via toolCode.json) and tools sbom (key-on
 - Create: `src/toolchain/tui/__init__.py`
 - Create: `src/toolchain/tui/browse.py`
 - Modify: `src/toolchain/groups/tools.py`
+- Modify: `pyproject.toml` (adds `pytest-asyncio` to the `dev` extra and sets `asyncio_mode = "auto"`)
 - Test: `tests/test_tui_browse.py`
 
 **Interfaces:**
@@ -3881,6 +3969,25 @@ def test_analytics_get_with_researcher_key_returns_unmasked(monkeypatch):
     payload = json.loads(result.output)
     assert payload["withheld"] is False
     assert payload["data"]["tools"][0]["name"] == "dockerscan"
+
+
+def test_analytics_get_with_practitioner_key_is_still_masked(monkeypatch):
+    # A key below Researcher tier hits the same /v1 endpoint and the API
+    # itself decides the masking — the CLI has no tier logic of its own,
+    # it just passes through whatever comes back.
+    masked = load("api_analytics_practitioner.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "analytics/notes_quality"
+            return masked
+
+    monkeypatch.setattr("toolchain.groups.analytics.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["-k", "ctk_practitioner_abc", "analytics", "get", "notes_quality"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["withheld"] is True
+    assert "▒" in payload["data"]["tools"][0]["name"]
 ```
 
 - [ ] **Step 3: Run test to verify it fails**
@@ -3924,7 +4031,7 @@ def analytics_get(ctx: click.Context, chart: str) -> None:
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_group_analytics.py -v`
-Expected: PASS (2 passed).
+Expected: PASS (3 passed).
 
 - [ ] **Step 6: Register the group**
 
