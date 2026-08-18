@@ -97,6 +97,10 @@ from .groups.releases import releases as releases_group
 
 cli.add_command(releases_group, name="releases")
 
+from .groups.categories import categories as categories_group
+
+cli.add_command(categories_group, name="categories")
+
 
 def main() -> None:
     try:
