@@ -25,6 +25,7 @@ def emit(data: Any, config: Config) -> None:
             limit=config.limit,
             search_fields=config.search_fields,
             short=config.short,
+            mode=config.mode,
         )
     )
 

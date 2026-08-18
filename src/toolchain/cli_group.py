@@ -1,7 +1,48 @@
 # src/toolchain/cli_group.py
 from __future__ import annotations
 
+import re
+
 import click
+
+from .colors import PALETTES
+
+_SECTION_HEADER_RE = re.compile(r"^(Usage|Options|Commands):", re.MULTILINE)
+#: A help-text line naming one option/command: 2-space indent, the
+#: name/flags, then a 2+ space gap before its description — how Click's
+#: HelpFormatter lays out both the Options and Commands sections.
+_ENTRY_LINE_RE = re.compile(r"^(  [-\w][-\w, ]*?)(\s{2,})(.*)$")
+
+
+def set_mode_meta(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
+    """Eager --mode callback: stashes the color mode on ctx.meta so it's
+    available to get_help() below, which (being tied to the eager --help
+    option) runs before the group's own callback would otherwise set
+    ctx.obj. An unrecognized value here is left for resolve_config to
+    reject properly later — help output just falls back to dark."""
+    ctx.meta["mode"] = value if value in PALETTES else "dark"
+    return value
+
+
+def colorize_help(text: str, mode: str) -> str:
+    """Bold the section headers and the name column of each Options/Commands
+    entry in Click's rendered help text, in the given mode's brand teal."""
+    color = PALETTES[mode]["teal"]
+
+    def header_repl(match: re.Match) -> str:
+        return click.style(f"{match.group(1)}:", fg=color, bold=True)
+
+    text = _SECTION_HEADER_RE.sub(header_repl, text)
+
+    lines = []
+    for line in text.split("\n"):
+        entry = _ENTRY_LINE_RE.match(line)
+        if entry:
+            name, gap, rest = entry.groups()
+            lines.append(click.style(name, fg=color) + gap + rest)
+        else:
+            lines.append(line)
+    return "\n".join(lines)
 
 GLOBAL_FLAGS: frozenset[str] = frozenset(
     {
@@ -37,6 +78,9 @@ _VALUE_FLAGS: frozenset[str] = frozenset(
 class GlobalOptionGroup(click.Group):
     """Detects a global flag used after the subcommand and prints a
     corrective example instead of a confusing per-subcommand parse error."""
+
+    def get_help(self, ctx: click.Context) -> str:
+        return colorize_help(super().get_help(ctx), ctx.meta.get("mode", "dark"))
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         sub_idx = None

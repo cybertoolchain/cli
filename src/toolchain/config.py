@@ -4,10 +4,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .colors import PALETTES
 from .models import UserInputError
 
 VALID_OUTPUTS: tuple[str, ...] = ("json", "table", "csv", "tsv")
-VALID_MODES: tuple[str, ...] = ("dark", "light", "sepia", "contrast")
+VALID_MODES: tuple[str, ...] = tuple(PALETTES)
 
 
 @dataclass(frozen=True)

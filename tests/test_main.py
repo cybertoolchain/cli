@@ -43,9 +43,27 @@ def test_bare_invocation_shows_brand_wordmark():
 
 
 def test_bare_invocation_wordmark_omits_cyber():
-    from toolchain.main import _LOGO
+    from toolchain.main import _LOGO_LINES
 
-    assert "┌─┐┬ ┬┌┐" not in _LOGO  # the dropped "cyber" block
+    assert "┌─┐┬ ┬┌┐" not in "".join(_LOGO_LINES)  # the dropped "cyber" block
+
+
+def test_render_icon_produces_half_block_art():
+    from toolchain.main import render_icon
+
+    icon = render_icon()
+    lines = icon.split("\n")
+    assert len(lines) == 14  # 28px asset, 2 rows per half-block character
+    assert any("▀" in line or "▄" in line for line in lines)
+
+
+def test_render_banner_places_icon_beside_the_wordmark():
+    from toolchain.main import render_banner
+
+    banner = render_banner("dark")
+    lines = banner.strip("\n").split("\n")
+    assert len(lines) == 14
+    assert "┌┬┐" in "".join(lines)
 
 
 def test_mode_defaults_to_dark_and_is_accepted():

@@ -5,14 +5,48 @@ import copy
 import csv
 import io
 import json
+import re
 from typing import Any
 
+import click
 from tabulate import tabulate
 
+from .colors import PALETTES
 from .models import UserInputError
 
 _PRIORITY_FIELDS = ("name", "tool", "display", "status", "severity", "category")
 _DEEMPHASIZE_SUFFIXES = ("id", "uuid", "url", "href")
+
+#: One token per match: a "key": string (with its trailing colon captured
+#: separately so it isn't colored), a bare string value, a number, or a
+#: true/false/null literal. Alternatives are tried left-to-right, so a
+#: quoted string is always consumed whole before the number/literal
+#: branches get a chance — safe for json.dumps output, which never emits
+#: an unescaped `"` inside a string.
+_JSON_TOKEN_RE = re.compile(
+    r'(?P<string>"(?:\\.|[^"\\])*")(?P<colon>\s*:)?'
+    r"|(?P<number>-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"
+    r"|(?P<literal>\btrue\b|\bfalse\b|\bnull\b)"
+)
+
+
+def highlight_json(text: str, mode: str) -> str:
+    """Colors json.dumps output with the brand palette for `mode`: keys in
+    teal, string values in blue, numbers in amber, true/false/null in
+    magenta. click strips these automatically when stdout isn't a tty, so
+    piped/redirected JSON is unaffected."""
+    palette = PALETTES[mode]
+
+    def replace(match: re.Match) -> str:
+        if match.group("string") is not None:
+            colon = match.group("colon") or ""
+            color = palette["teal"] if colon else palette["blue"]
+            return click.style(match.group("string"), fg=color) + colon
+        if match.group("number") is not None:
+            return click.style(match.group("number"), fg=palette["amber"])
+        return click.style(match.group("literal"), fg=palette["magenta"])
+
+    return _JSON_TOKEN_RE.sub(replace, text)
 
 
 def extract_items(data: Any) -> list[dict] | None:
@@ -93,6 +127,7 @@ def format_output(
     limit: int | None = None,
     search_fields: str | None = None,
     short: bool = False,
+    mode: str = "dark",
 ) -> str:
     if search_fields:
         data = _search_fields(data, search_fields)
@@ -120,10 +155,11 @@ def format_output(
 
     if short:
         rows = items if items is not None else ([data] if isinstance(data, dict) else [])
-        return "\n".join(json.dumps(_reorder(row), separators=(",", ":")) for row in rows)
+        text = "\n".join(json.dumps(_reorder(row), separators=(",", ":")) for row in rows)
+        return highlight_json(text, mode)
 
     if fmt == "json":
-        return json.dumps(data, indent=2)
+        return highlight_json(json.dumps(data, indent=2), mode)
 
     if items is None:
         raise UserInputError(

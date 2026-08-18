@@ -5,43 +5,79 @@ import sys
 
 import click
 
-from .cli_group import GlobalOptionGroup
+from .cli_group import GlobalOptionGroup, set_mode_meta
+from .colors import PALETTES
 from .config import VALID_OUTPUTS, resolve_config
 from .log import configure_logging
 from .models import ToolchainError
 
 # Brand kit ASCII wordmark ("toolchain" block only — the "cyber" block
 # is dropped, this CLI is shared with aitoolchain), verbatim from
-# generator/site/public/brand/cyber-toolchain-ascii.txt. Embedded rather
-# than read from that sibling repo, since a customer running this CLI
-# won't have it checked out.
-_LOGO = (
-    "┌┬┐┌─┐┌─┐┬  ┌─┐┬ ┬┌─┐┬┌┐┌\n"
-    " │ │ ││ ││  │  ├─┤├─┤││││\n"
-    " ┴ └─┘└─┘┴─┘└─┘┴ ┴┴ ┴┴┘└┘"
+# generator/site/public/brand/cyber-toolchain-ascii.txt.
+_LOGO_LINES = (
+    "┌┬┐┌─┐┌─┐┬  ┌─┐┬ ┬┌─┐┬┌┐┌",
+    " │ │ ││ ││  │  ├─┤├─┤││││",
+    " ┴ └─┘└─┘┴─┘└─┘┴ ┴┴ ┴┴┘└┘",
 )
 
-# brand.yaml palette.<mode>.teal — the one accent every site theme keys
-# off of, per theme. click strips ANSI automatically for non-tty output
-# and when NO_COLOR is set.
-MODE_COLORS: dict[str, tuple[int, int, int]] = {
-    "dark": (0x34, 0xE2, 0xD4),
-    "light": (0x05, 0x6F, 0x66),
-    "sepia": (0x0F, 0x73, 0x6A),
-    "contrast": (0x45, 0xF0, 0xDE),
-}
+
+def render_icon() -> str:
+    """The brand mark (cyber-toolchain-lockup-hero.png's icon, cropped to
+    its rounded-square glyph and downsampled to 28x28) as true-color ANSI
+    half-block art — packaged as src/toolchain/assets/icon.png rather than
+    read from the sibling site repo, since a customer running this CLI
+    won't have it checked out. Uses the asset's own brand colors; unlike
+    the wordmark, this doesn't recolor per --mode."""
+    from importlib import resources
+
+    from PIL import Image
+
+    ref = resources.files("toolchain") / "assets" / "icon.png"
+    with resources.as_file(ref) as path, Image.open(path) as im:
+        im = im.convert("RGBA")
+        width, height = im.size
+        pixels = im.load()
+
+    lines = []
+    for y in range(0, height - 1, 2):
+        cells = []
+        for x in range(width):
+            top = pixels[x, y]
+            bottom = pixels[x, y + 1]
+            top_on = top[3] >= 128
+            bottom_on = bottom[3] >= 128
+            if not top_on and not bottom_on:
+                cells.append(" ")
+            elif top_on and bottom_on:
+                cells.append(click.style("▀", fg=top[:3], bg=bottom[:3]))
+            elif top_on:
+                cells.append(click.style("▀", fg=top[:3]))
+            else:
+                cells.append(click.style("▄", fg=bottom[:3]))
+        lines.append("".join(cells))
+    return "\n".join(lines)
 
 
 def render_banner(mode: str) -> str:
-    color = MODE_COLORS[mode]
-    return "\n" + click.style(_LOGO, fg=color, bold=True) + "\n"
+    color = PALETTES[mode]["teal"]
+    icon_lines = render_icon().split("\n")
+    word_lines = [click.style(line, fg=color, bold=True) for line in _LOGO_LINES]
+
+    top_pad = (len(icon_lines) - len(word_lines)) // 2
+    rows = []
+    for i, icon_line in enumerate(icon_lines):
+        word_idx = i - top_pad
+        word_line = word_lines[word_idx] if 0 <= word_idx < len(word_lines) else ""
+        rows.append(f"{icon_line}  {word_line}")
+    return "\n" + "\n".join(rows) + "\n"
 
 TLDR = """\
 toolchain tools list                    # every tracked tool
 toolchain tools get nmap                # one tool + its latest release
 toolchain --limit 10 releases latest    # what just shipped, across the watchlist
-toolchain issues get 044                # one newsletter issue, as data
-toolchain issues read 044               # ...and as a rendered document
+toolchain issues tail list              # just the tail-series issues
+toolchain issues read tail/44           # one issue, rendered as a document
+toolchain issues                        # browse issues interactively
 toolchain search "runtime security"     # tools + releases matching a query
 
 Add -k/--api-key (or set TOOLCHAIN_API_KEY) for live filtering, full
@@ -63,9 +99,13 @@ every option.
 @click.option("--search-fields", default=None)
 @click.option(
     "--mode",
+    envvar="TOOLCHAIN_MODE",
     default=None,
-    help="Color palette for the banner: dark|light|sepia|contrast, matching "
-    "the website's 4 themes (env: TOOLCHAIN_MODE, default: dark).",
+    is_eager=True,
+    callback=set_mode_meta,
+    help="Color palette for the banner, help menu, and JSON output: "
+    "dark|light|sepia|contrast, matching the website's 4 themes "
+    "(env: TOOLCHAIN_MODE, default: dark).",
 )
 @click.pass_context
 def cli(

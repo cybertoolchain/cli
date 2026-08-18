@@ -3,11 +3,19 @@ from __future__ import annotations
 
 import json
 
+import click
 from hypothesis import given
 from hypothesis import strategies as st
 
 from toolchain.models import UserInputError
 from toolchain.output import extract_items, format_output
+
+
+def _plain(out: str) -> str:
+    """format_output() colors JSON with ANSI (click.echo strips it for
+    non-tty/piped output at the real call sites, but these tests call
+    format_output() directly)."""
+    return click.unstyle(out)
 
 TOOLS_RESPONSE = {
     "tools": [
@@ -34,12 +42,12 @@ def test_extract_items_picks_the_largest_list():
 
 def test_json_is_the_default_format():
     out = format_output(TOOLS_RESPONSE)
-    assert json.loads(out) == TOOLS_RESPONSE
+    assert json.loads(_plain(out)) == TOOLS_RESPONSE
 
 
 def test_json_output_is_indented():
     out = format_output({"a": 1}, fmt="json")
-    assert out == '{\n  "a": 1\n}'
+    assert _plain(out) == '{\n  "a": 1\n}'
 
 
 def test_table_renders_a_grid_with_headers():
@@ -78,7 +86,7 @@ def test_tsv_uses_tab_delimiter():
 
 def test_limit_truncates_the_item_list():
     out = format_output(TOOLS_RESPONSE, fmt="json", limit=1)
-    assert len(json.loads(out)["tools"]) == 1
+    assert len(json.loads(_plain(out))["tools"]) == 1
 
 
 def test_limit_only_truncates_the_actual_target_list_when_nested_under_another_key():
@@ -91,13 +99,13 @@ def test_limit_only_truncates_the_actual_target_list_when_nested_under_another_k
         "series": {"rows": [{"x": 1}, {"x": 2}, {"x": 3}]},
     }
     out = format_output(data, fmt="json", limit=1)
-    result = json.loads(out)
+    result = json.loads(_plain(out))
     assert result["notes"] == [{"a": 1}]
     assert result["series"]["rows"] == [{"x": 1}]
 
 
 def test_short_gives_one_json_line_per_row():
-    out = format_output(TOOLS_RESPONSE, short=True)
+    out = _plain(format_output(TOOLS_RESPONSE, short=True))
     lines = out.strip().splitlines()
     assert len(lines) == 2
     for line in lines:
@@ -105,14 +113,14 @@ def test_short_gives_one_json_line_per_row():
 
 
 def test_short_reorders_name_first():
-    out = format_output(TOOLS_RESPONSE, short=True)
+    out = _plain(format_output(TOOLS_RESPONSE, short=True))
     first_line = out.strip().splitlines()[0]
     assert list(json.loads(first_line).keys())[0] == "name"
 
 
 def test_search_fields_pulls_matching_values_with_count():
     out = format_output(TOOLS_RESPONSE, search_fields="category")
-    result = json.loads(out)
+    result = json.loads(_plain(out))
     assert result["field"] == "category"
     assert result["count"] == 2
     assert sorted(result["values"]) == ["reconnaissance", "runtime-security"]
@@ -122,3 +130,28 @@ def test_search_fields_pulls_matching_values_with_count():
 def test_extract_items_never_crashes_on_arbitrary_lists(items):
     data = {"wrapped": items}
     extract_items(data)  # must not raise, for any list-of-dicts shape
+
+
+def test_json_output_is_colored_and_stays_valid_json_once_stripped():
+    out = format_output({"name": "Nmap", "count": 2, "ok": True, "notes": None}, mode="dark")
+    assert "\x1b[" in out  # actually colored, not a no-op
+    assert json.loads(click.unstyle(out)) == {
+        "name": "Nmap",
+        "count": 2,
+        "ok": True,
+        "notes": None,
+    }
+
+
+def test_json_output_recolors_per_mode():
+    dark = format_output({"a": "b"}, mode="dark")
+    contrast = format_output({"a": "b"}, mode="contrast")
+    assert dark != contrast
+    assert click.unstyle(dark) == click.unstyle(contrast)
+
+
+def test_short_output_is_colored_and_stays_valid_json_once_stripped():
+    out = format_output(TOOLS_RESPONSE, short=True, mode="dark")
+    assert "\x1b[" in out
+    for line in click.unstyle(out).strip().splitlines():
+        json.loads(line)
