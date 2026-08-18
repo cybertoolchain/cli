@@ -50,5 +50,22 @@ def test_timeout_defaults_to_30():
     assert resolve_config().timeout == 30.0
 
 
+def test_bad_timeout_env_var_raises_user_input_error(monkeypatch):
+    monkeypatch.setenv("TOOLCHAIN_TIMEOUT", "abc")
+    with pytest.raises(UserInputError, match="TOOLCHAIN_TIMEOUT must be a number, got 'abc'"):
+        resolve_config()
+
+
+def test_non_positive_timeout_env_var_raises_user_input_error(monkeypatch):
+    monkeypatch.setenv("TOOLCHAIN_TIMEOUT", "0")
+    with pytest.raises(UserInputError, match="timeout"):
+        resolve_config()
+
+
+def test_negative_timeout_flag_raises_user_input_error():
+    with pytest.raises(UserInputError, match="timeout"):
+        resolve_config(timeout=-5.0)
+
+
 def test_valid_outputs_are_stable():
     assert VALID_OUTPUTS == ("json", "table", "csv", "tsv")

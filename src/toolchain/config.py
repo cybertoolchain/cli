@@ -79,9 +79,19 @@ def resolve_config(
             f"Unsupported --output '{resolved_output}'. Supported values are: {supported}"
         )
 
-    resolved_timeout = (
-        timeout if timeout is not None else float(os.environ.get("TOOLCHAIN_TIMEOUT", "30"))
-    )
+    if timeout is not None:
+        resolved_timeout = timeout
+    else:
+        raw_timeout = os.environ.get("TOOLCHAIN_TIMEOUT", "30")
+        try:
+            resolved_timeout = float(raw_timeout)
+        except ValueError as exc:
+            raise UserInputError(
+                f"TOOLCHAIN_TIMEOUT must be a number, got '{raw_timeout}'"
+            ) from exc
+
+    if resolved_timeout <= 0:
+        raise UserInputError(f"--timeout must be greater than 0, got {resolved_timeout}")
 
     return Config(
         api_key=resolved_key,
