@@ -47,7 +47,7 @@ def test_tools_list_uses_api_source_with_key(monkeypatch):
     assert payload["tools"][0]["slug"] == "nmap"
 
 
-def test_tools_list_passes_filters_as_params(monkeypatch):
+def test_tools_list_passes_filters_as_params_keyed_path(monkeypatch):
     captured = {}
 
     class StubSource:
@@ -56,12 +56,77 @@ def test_tools_list_passes_filters_as_params(monkeypatch):
             return {"tools": []}
 
     monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
-    CliRunner().invoke(cli, ["tools", "list", "--category", "reconnaissance", "--q", "scan"])
+    CliRunner().invoke(
+        cli, ["-k", "ctk_live_abc", "tools", "list", "--category", "reconnaissance", "--q", "scan"]
+    )
     assert captured["category"] == "reconnaissance"
     assert captured["q"] == "scan"
 
 
-def test_tools_count(monkeypatch):
+def test_tools_list_no_key_filters_client_side_by_category(monkeypatch):
+    site_data = load("site_tools.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools.json"
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "list", "--category", "reconnaissance"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload["tools"]) == 1
+    assert payload["tools"][0]["tool"] == "Nmap"
+
+
+def test_tools_list_no_key_filters_client_side_by_q(monkeypatch):
+    site_data = load("site_tools.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "list", "--q", "falco"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload["tools"]) == 1
+    assert payload["tools"][0]["tool"] == "Falco"
+
+
+def test_tools_list_no_key_filters_client_side_by_license(monkeypatch):
+    site_data = load("site_tools.json")
+    # Both fixture rows are open_source: true — flip one to exercise the
+    # commercial branch and confirm license filtering actually narrows.
+    site_data["tools"][1]["open_source"] = False
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "list", "--license", "commercial"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload["tools"]) == 1
+    assert payload["tools"][0]["tool"] == "Falco"
+
+
+def test_tools_list_no_key_ignores_cursor(monkeypatch):
+    site_data = load("site_tools.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "list", "--cursor", "anything"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload["tools"]) == 2
+
+
+def test_tools_count_with_key_uses_v1_count_path(monkeypatch):
     api_data = load("api_tools_count.json")
 
     class StubSource:
@@ -73,6 +138,33 @@ def test_tools_count(monkeypatch):
     result = CliRunner().invoke(cli, ["-k", "ctk_live_abc", "tools", "count"])
     assert result.exit_code == 0
     assert json.loads(result.output)["total"] == 836
+
+
+def test_tools_count_no_key_counts_the_site_snapshot(monkeypatch):
+    site_data = load("site_tools.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "tools.json"
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "count"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)["total"] == 2
+
+
+def test_tools_count_no_key_applies_the_same_filters_as_tools_list(monkeypatch):
+    site_data = load("site_tools.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "count", "--category", "reconnaissance"])
+    assert result.exit_code == 0
+    assert json.loads(result.output)["total"] == 1
 
 
 def test_tools_get_no_key_finds_tool_by_name_in_site_data(monkeypatch):
@@ -132,6 +224,20 @@ def test_tools_releases_no_key_filters_entries_by_tool(monkeypatch):
     payload = json.loads(result.output)
     assert len(payload) == 2
     assert all(row["name"] == "nmap" for row in payload)
+
+
+def test_tools_releases_no_key_unknown_slug_is_user_input_error(monkeypatch):
+    entries = load("site_entries.json")
+
+    class StubSource:
+        def fetch(self, path, **params):
+            assert path == "entries.json"
+            return entries
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "releases", "not-a-real-tool"])
+    assert result.exit_code == 1
+    assert "not-a-real-tool" in result.output
 
 
 def test_tools_releases_with_key_uses_v1_path(monkeypatch):

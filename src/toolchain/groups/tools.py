@@ -18,6 +18,32 @@ def _slug_of(tool_row: dict) -> str:
     return str(tool_row.get("tool", "")).lower().replace(" ", "-")
 
 
+def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[dict]:
+    """Client-side equivalent of the API's query params, for the no-key
+    path where the fetched payload is a static tools.json — a query string
+    against a static file does nothing, so filtering has to happen here.
+    Used by both `tools list` and `tools count`."""
+    if category is not None:
+        rows = [row for row in rows if row.get("category") == category]
+    if license_ is not None:
+        # site JSON's open_source is True/False, or None when unknown — an
+        # unknown value doesn't match either license filter, which is the
+        # more honest behavior than guessing.
+        wanted = license_ == "open-source"
+        rows = [row for row in rows if row.get("open_source") is wanted]
+    if tool_type is not None:
+        # The free tools.json (generator/site/src/lib/feed.ts's FeedEntry)
+        # does not carry a tool_type field per tool at all — only the keyed
+        # /v1/tools response does. So this filter can never match anything
+        # in the no-key path; that's a real limitation of the free data,
+        # not a bug in this filter.
+        rows = [row for row in rows if row.get("tool_type") == tool_type]
+    if q is not None:
+        needle = q.lower()
+        rows = [row for row in rows if needle in str(row.get("tool", "")).lower()]
+    return rows
+
+
 @tools.command("list")
 @click.option("--category", default=None)
 @click.option("--license", "license_", default=None, type=click.Choice(["open-source", "commercial"]))
@@ -42,8 +68,11 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> 
         }.items()
         if v is not None
     }
-    path = "tools" if config.api_key else "tools.json"
-    data = source.fetch(path, **params)
+    if config.api_key:
+        data = source.fetch("tools", **params)
+    else:
+        data = source.fetch("tools.json")
+        data = {**data, "tools": _filter_tools(data["tools"], category, license_, tool_type, q)}
     emit(data, config)
 
 
@@ -54,21 +83,21 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> 
 @click.pass_context
 @handle_errors
 def tools_count(ctx: click.Context, category, license_, tool_type) -> None:
-    """Just the number — requires an API key (there is no site-JSON count
-    endpoint; count it yourself from `tools list` if you have no key)."""
+    """Just the number. No key: counted client-side from the free watchlist
+    snapshot. With a key: live, server-side count."""
     config = get_config(ctx)
-    if not config.api_key:
-        raise UserInputError(
-            "tools count requires an API key — get one at "
-            f"{config.site.site_base}/account (any plan)."
-        )
     source = resolve_source(config)
-    params = {
-        k: v
-        for k, v in {"category": category, "license": license_, "tool_type": tool_type}.items()
-        if v is not None
-    }
-    data = source.fetch("tools/count", **params)
+    if config.api_key:
+        params = {
+            k: v
+            for k, v in {"category": category, "license": license_, "tool_type": tool_type}.items()
+            if v is not None
+        }
+        data = source.fetch("tools/count", **params)
+    else:
+        site_data = source.fetch("tools.json")
+        filtered = _filter_tools(site_data["tools"], category, license_, tool_type, None)
+        data = {"total": len(filtered)}
     emit(data, config)
 
 
@@ -115,6 +144,11 @@ def tools_releases(ctx: click.Context, slug: str, since, until) -> None:
     else:
         entries = source.fetch("entries.json")
         data = [row for row in entries if row.get("name") == slug.lower()]
+        if not data:
+            raise UserInputError(
+                f"No release history found for '{slug}'. Run 'toolchain tools list' to see "
+                "tracked tools."
+            )
         if config.limit is not None:
             data = data[: config.limit]
     emit(data, config)

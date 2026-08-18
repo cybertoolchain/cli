@@ -22,6 +22,14 @@ The design spec listed `tools stack` as key-only. Implementation found
 reads it with no key and only calls `/v1/tools/{slug}/stack` with one. If
 this surprises you, it's a real, deliberate correction — not a bug.
 
+`tools count` is also free with no key, contrary to what an earlier version
+of the design implied. It has no site-JSON count endpoint, but `tools.json`
+(already fetched by `tools list`/`tools get`) carries the full tool list, so
+the no-key path fetches it and counts client-side after applying the same
+`--category`/`--license`/`--tool_type` filters `tools list` applies (see
+`_filter_tools` in `src/toolchain/groups/tools.py`). The keyed path still
+calls `/v1/tools/count` for a live, server-side count.
+
 ## `--debug` and the httpx/httpcore logging landmine
 
 `ApiSource.curl()` is structurally leak-proof — it never references the raw
