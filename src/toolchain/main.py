@@ -10,13 +10,21 @@ from .config import VALID_OUTPUTS, resolve_config
 from .log import configure_logging
 from .models import ToolchainError
 
-BANNER = r"""
- _____           _      _           _
-|_   _|__   ___ | | ___| |__   __ _(_)_ __
-  | |/ _ \ / _ \| |/ __| '_ \ / _` | | '_ \
-  | | (_) | (_) | | (__| | | | (_| | | | | |
-  |_|\___/ \___/|_|\___|_| |_|\__,_|_|_| |_|
-"""
+# Brand kit ASCII wordmark, verbatim from
+# generator/site/public/brand/cyber-toolchain-ascii.txt — embedded rather
+# than read from that sibling repo, since a customer running this CLI
+# won't have it checked out.
+_LOGO = (
+    "┌─┐┬ ┬┌┐ ┌─┐┬─┐\n"
+    "│  └┬┘├┴┐├┤ ├┬┘\n"
+    "└─┘ ┴ └─┘└─┘┴└─\n"
+    "┌┬┐┌─┐┌─┐┬  ┌─┐┬ ┬┌─┐┬┌┐┌\n"
+    " │ │ ││ ││  │  ├─┤├─┤││││\n"
+    " ┴ └─┘└─┘┴─┘└─┘┴ ┴┴ ┴┴┘└┘"
+)
+# brand.yaml palette.dark.teal (#34e2d4) — the one accent every theme
+# keys off of. click strips this automatically for non-tty output / NO_COLOR.
+BANNER = "\n" + click.style(_LOGO, fg=(0x34, 0xE2, 0xD4), bold=True) + "\n"
 
 TLDR = """\
 toolchain tools list                    # every tracked tool
@@ -87,6 +95,13 @@ def cli(
 def tldr() -> None:
     """Quick reference for common commands."""
     click.echo(TLDR)
+
+
+@cli.command("help")
+@click.pass_context
+def help_command(ctx: click.Context) -> None:
+    """Show this message and exit."""
+    click.echo(ctx.parent.get_help())
 
 
 from .groups.tools import tools as tools_group

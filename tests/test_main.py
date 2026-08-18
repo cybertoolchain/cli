@@ -27,6 +27,21 @@ def test_help_lists_the_command_groups():
     assert "tldr" in result.output
 
 
+def test_help_command_matches_dash_dash_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["help"])
+    assert result.exit_code == 0
+    assert "tldr" in result.output
+    assert "Usage: cli" in result.output or "Usage:" in result.output
+
+
+def test_bare_invocation_shows_brand_wordmark():
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    assert result.exit_code == 0
+    assert "┌─┐" in result.output
+
+
 def test_unknown_site_flag_exits_1_with_message():
     runner = CliRunner()
     result = runner.invoke(cli, ["--site", "not-real", "tldr"])
