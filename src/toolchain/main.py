@@ -93,6 +93,10 @@ from .groups.tools import tools as tools_group
 
 cli.add_command(tools_group, name="tools")
 
+from .groups.releases import releases as releases_group
+
+cli.add_command(releases_group, name="releases")
+
 
 def main() -> None:
     try:

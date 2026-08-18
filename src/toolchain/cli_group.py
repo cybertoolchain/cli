@@ -50,13 +50,41 @@ class GlobalOptionGroup(click.Group):
             break
 
         if sub_idx is not None:
+            # Walk through the nested group structure to find the actual command
+            current_group = self
+            command_idx = sub_idx
+            while command_idx < len(args):
+                subcommand_name = args[command_idx]
+                if subcommand_name.startswith("-"):
+                    break
+                subcommand = current_group.get_command(ctx, subcommand_name)
+                if subcommand is None:
+                    break
+                if isinstance(subcommand, click.Group):
+                    # It's a group, continue to the next token
+                    command_idx += 1
+                    current_group = subcommand
+                else:
+                    # It's a command, stop here
+                    break
+
+            # Now check if the command has the option
+            actual_command = subcommand
             for token in args[sub_idx + 1 :]:
                 name = token.split("=", 1)[0]
                 if name in GLOBAL_FLAGS:
-                    raise click.UsageError(
-                        f"'{name}' is a global option and must appear before the subcommand.\n\n"
-                        "  toolchain [GLOBAL OPTIONS] GROUP COMMAND ...\n\n"
-                        "Example:\n"
-                        f"  toolchain {name} <value> {' '.join(args[:sub_idx + 1])}"
-                    )
+                    # Check if the command has this option
+                    has_option = False
+                    if actual_command is not None and hasattr(actual_command, "params"):
+                        has_option = any(
+                            name in (p.opts + p.secondary_opts) if hasattr(p, "secondary_opts") else p.opts
+                            for p in actual_command.params
+                        )
+                    if not has_option:
+                        raise click.UsageError(
+                            f"'{name}' is a global option and must appear before the subcommand.\n\n"
+                            "  toolchain [GLOBAL OPTIONS] GROUP COMMAND ...\n\n"
+                            "Example:\n"
+                            f"  toolchain {name} <value> {' '.join(args[:sub_idx + 1])}"
+                        )
         return super().parse_args(ctx, args)
