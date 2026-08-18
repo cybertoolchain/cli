@@ -10,6 +10,7 @@ import httpx
 class FakeResponse:
     status_code: int
     json_data: dict | None = None
+    text: str = ""
 
     def json(self) -> dict:
         return self.json_data or {}

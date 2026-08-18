@@ -37,6 +37,18 @@ class SiteSource:
             raise APIError(f"{response.status_code} fetching {url}")
         return response.json()
 
+    def fetch_text(self, path: str, **params: Any) -> str:
+        url = self._url(path)
+        try:
+            response = self._client.get(url, params=params or None)
+        except httpx.TimeoutException as exc:
+            raise NetworkError(f"Timed out fetching {url}") from exc
+        except httpx.ConnectError as exc:
+            raise NetworkError(f"Could not connect to {url}") from exc
+        if response.status_code >= 400:
+            raise APIError(f"{response.status_code} fetching {url}")
+        return response.text
+
     def curl(self, path: str, **params: Any) -> str:
         url = self._url(path)
         if params:

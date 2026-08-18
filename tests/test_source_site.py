@@ -78,3 +78,15 @@ def test_curl_includes_params():
     assert source.curl("entries.json", tool="nmap") == (
         "curl https://cybertoolchain.github.io/entries.json?tool=nmap"
     )
+
+
+def test_fetch_text_returns_raw_body():
+    client = FakeClient(
+        responses={
+            "https://cybertoolchain.github.io/newsletter/tail/44": FakeResponse(
+                200, text="<html>issue 44</html>"
+            )
+        }
+    )
+    source = SiteSource("https://cybertoolchain.github.io", client=client)
+    assert source.fetch_text("newsletter/tail/44") == "<html>issue 44</html>"
