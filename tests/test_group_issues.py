@@ -211,11 +211,12 @@ def test_issues_bare_invocation_opens_the_browser(monkeypatch):
             return entries
 
     class FakeApp:
-        def __init__(self, issues):
+        def __init__(self, issues, entries_fetcher):
             self.issues = issues
+            self.entries_fetcher = entries_fetcher
 
         def run(self):
-            return None  # simulate Ctrl+C — no selection
+            return None  # simulate quitting with no selection
 
     monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
     monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
@@ -233,8 +234,9 @@ def test_issues_bare_invocation_dedupes_rows_by_issue_slug(monkeypatch):
             return entries
 
     class FakeApp:
-        def __init__(self, issues):
+        def __init__(self, issues, entries_fetcher):
             captured["rows"] = issues
+            captured["fetcher"] = entries_fetcher
 
         def run(self):
             return None
@@ -255,7 +257,7 @@ def test_issues_series_bare_invocation_opens_a_scoped_browser(monkeypatch):
             return entries
 
     class FakeApp:
-        def __init__(self, issues):
+        def __init__(self, issues, entries_fetcher):
             captured["rows"] = issues
 
         def run(self):
@@ -268,25 +270,49 @@ def test_issues_series_bare_invocation_opens_a_scoped_browser(monkeypatch):
     assert all(row["issue_slug"].startswith("tail/") for row in captured["rows"])
 
 
-def test_issues_browse_selection_prints_the_rendered_issue(monkeypatch):
+def test_issues_browse_rows_include_published_date_and_tool_list(monkeypatch):
     entries = load("site_entries.json")
+    captured = {}
 
     class StubSource:
         def fetch(self, path, **params):
             return entries
 
     class FakeApp:
-        def __init__(self, issues):
-            pass
+        def __init__(self, issues, entries_fetcher):
+            captured["rows"] = issues
 
         def run(self):
-            return "tail/44"  # simulate Enter on that row
+            return None
 
     monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
     monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
-    result = CliRunner().invoke(cli, ["issues"])
-    assert result.exit_code == 0
-    assert "Nmap" in result.output
+    CliRunner().invoke(cli, ["issues"])
+    row = next(r for r in captured["rows"] if r["issue_slug"] == "tail/44")
+    assert row["published_at"] == "2026-08-09T22:03:18+00:00"
+    assert row["tools"] == ["Nmap"]
+
+
+def test_issues_browse_entries_fetcher_reads_the_selected_issue(monkeypatch):
+    entries = load("site_entries.json")
+    captured = {}
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return entries
+
+    class FakeApp:
+        def __init__(self, issues, entries_fetcher):
+            captured["fetcher"] = entries_fetcher
+
+        def run(self):
+            return None
+
+    monkeypatch.setattr("toolchain.groups.issues.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.tui.issues_browse.IssueBrowserApp", FakeApp)
+    CliRunner().invoke(cli, ["issues"])
+    selected_entries = captured["fetcher"]("tail/44")
+    assert selected_entries[0]["tool"] == "Nmap"
 
 
 def test_issues_download_with_key_uses_v1_path(monkeypatch):

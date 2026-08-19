@@ -85,38 +85,42 @@ def _read(ctx: click.Context, issue: str) -> None:
 
 def _browse(ctx: click.Context, series: str | None) -> None:
     from ..tui.issues_browse import IssueBrowserApp
-    from ..tui.reader import render_issue
 
     config, data = _list_data(ctx, series)
     if config.api_key:
-        rows = data.get("issues", data if isinstance(data, list) else [])
+        issues = data.get("issues", data if isinstance(data, list) else [])
+        rows = [
+            {
+                "issue_slug": row.get("issue_slug", ""),
+                "published_at": row.get("published_at", ""),
+                "tools": row.get("tools") or ([row["tool"]] if row.get("tool") else []),
+            }
+            for row in issues
+        ]
     else:
-        # entries.json is one row per (tool, issue) pair — dedupe to one
-        # row per issue for the browser, keeping the first entry's tool
-        # and date as a preview.
+        # entries.json is one row per (tool, issue) pair — collapse to one
+        # row per issue for the browser, collecting every tool featured
+        # in that issue.
         seen: dict[str, dict] = {}
         for row in data:
             slug = row.get("issue_slug", "")
-            seen.setdefault(
-                slug,
-                {
-                    "issue_slug": slug,
-                    "tool": row.get("tool", ""),
-                    "published_at": row.get("published_at", ""),
-                },
+            entry = seen.setdefault(
+                slug, {"issue_slug": slug, "published_at": row.get("published_at", ""), "tools": []}
             )
+            tool = row.get("tool", "")
+            if tool and tool not in entry["tools"]:
+                entry["tools"].append(tool)
         rows = list(seen.values())
 
-    app = IssueBrowserApp(rows)
-    selected = app.run()
-    if selected is None:
-        return
     source = resolve_source(config)
-    if config.api_key:
-        entries = source.fetch(f"issues/{selected}").get("entries", [])
-    else:
-        entries = _entries_no_key(source, selected)
-    click.echo(render_issue(entries))
+
+    def entries_fetcher(issue_slug: str) -> list[dict]:
+        if config.api_key:
+            return source.fetch(f"issues/{issue_slug}").get("entries", [])
+        return _entries_no_key(source, issue_slug)
+
+    app = IssueBrowserApp(rows, entries_fetcher)
+    app.run()
 
 
 @click.group(invoke_without_command=True)

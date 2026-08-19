@@ -37,6 +37,13 @@ def _to_markdown(entries: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def issue_markdown(entries: list[dict[str, Any]]) -> str:
+    """The raw Markdown source for a list of issue entries — for feeding
+    into Textual's own `Markdown` widget so it can render (and
+    syntax-highlight fenced code blocks) natively inside the TUI."""
+    return _to_markdown(entries)
+
+
 def render_issue(entries: list[dict[str, Any]]) -> str:
     """Renders a list of issue entries (the same shape `issues get` emits)
     as syntax-highlighted, formatted text suitable for a terminal or a

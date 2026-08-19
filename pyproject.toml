@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "toolchain-cli"
 version = "0.1.0"
 description = "Command-line client for The Cyber Toolchain and aitoolchain"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.0",
     "httpx>=0.24",
@@ -14,6 +14,7 @@ dependencies = [
     "textual>=0.60",
     "rich>=13.7",
     "pillow>=10.0",
+    "textual-image[textual]>=0.13.2",
 ]
 
 [project.optional-dependencies]
