@@ -237,6 +237,11 @@ from .groups.search import search as search_command
 
 cli.add_command(search_command, name="search")
 
+from .groups.version import update_command, version_command
+
+cli.add_command(version_command, name="version")
+cli.add_command(update_command, name="update")
+
 
 def main() -> None:
     try:
