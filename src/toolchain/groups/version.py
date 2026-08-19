@@ -19,7 +19,10 @@ def version_command() -> None:
     click.echo(f"toolchain-cli {current_version()}")
     newer = update_available()
     if newer:
-        click.echo(f"A newer version is available: {newer} — run 'toolchain update' to upgrade.")
+        click.echo(
+            f"A newer version is available: {newer}. Run 'toolchain update' to upgrade.",
+            err=True,
+        )
 
 
 @click.command("update")

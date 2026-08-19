@@ -11,17 +11,22 @@ def test_version_command_prints_the_installed_version(monkeypatch):
     monkeypatch.setattr("toolchain.groups.version.update_available", lambda: None)
     result = CliRunner().invoke(cli, ["version"])
     assert result.exit_code == 0
-    assert "toolchain-cli 1.2.3" in result.output
-    assert "newer version" not in result.output
+    assert result.stdout == "toolchain-cli 1.2.3\n"
+    assert result.stderr == ""
 
 
-def test_version_command_notes_an_available_update(monkeypatch):
+def test_version_command_checks_every_time_and_warns_on_stderr(monkeypatch):
+    checked = []
     monkeypatch.setattr("toolchain.groups.version.current_version", lambda: "1.2.3")
-    monkeypatch.setattr("toolchain.groups.version.update_available", lambda: "1.3.0")
+    monkeypatch.setattr(
+        "toolchain.groups.version.update_available", lambda: checked.append(1) or "1.3.0"
+    )
     result = CliRunner().invoke(cli, ["version"])
     assert result.exit_code == 0
-    assert "1.3.0" in result.output
-    assert "toolchain update" in result.output
+    assert checked == [1]  # the check ran unconditionally, no flag needed
+    assert result.stdout == "toolchain-cli 1.2.3\n"
+    assert "1.3.0" in result.stderr
+    assert "toolchain update" in result.stderr
 
 
 def test_update_command_runs_uv_tool_upgrade(monkeypatch):
