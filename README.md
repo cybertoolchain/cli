@@ -44,6 +44,24 @@ until one ships.
 help menu, and JSON output to match the site's theme). Must appear
 **before** the subcommand. `toolchain help` works the same as `--help`.
 
+## Shell completion
+
+Tab-completion for commands and options, bash and zsh:
+
+    # bash — add to ~/.bashrc
+    source /path/to/cli/completions/toolchain.bash
+
+    # zsh — add to ~/.zshrc, before compinit
+    source /path/to/cli/completions/toolchain.zsh
+
+Regenerate both after adding/renaming a command or option:
+
+    _TOOLCHAIN_COMPLETE=bash_source toolchain > completions/toolchain.bash
+    _TOOLCHAIN_COMPLETE=zsh_source toolchain > completions/toolchain.zsh
+
+`tests/test_completions.py` fails if the committed files drift from what the
+CLI would generate, as a reminder to re-run the above.
+
 ## Development
 
     uv run pytest
