@@ -78,6 +78,14 @@ def render_icon(mode: str) -> str:
     return "\n".join(lines)
 
 
+def render_logo_small(mode: str) -> str:
+    """Wordmark-only mark (no icon) for lightweight, frequently-run
+    subcommands like tldr/help, where the full 14-line render_banner()
+    icon would overwhelm a quick reference."""
+    color = PALETTES[mode]["teal"]
+    return "\n".join(click.style(line, fg=color, bold=True) for line in _LOGO_LINES)
+
+
 def render_banner(mode: str) -> str:
     color = PALETTES[mode]["teal"]
     icon_lines = render_icon(mode).split("\n")
@@ -186,6 +194,7 @@ def cli(
 @click.pass_context
 def tldr(ctx: click.Context) -> None:
     """Quick reference for common commands."""
+    click.echo(render_logo_small(ctx.obj.mode) + "\n", err=True)
     click.echo(render_tldr(ctx.obj.mode))
 
 
@@ -193,6 +202,7 @@ def tldr(ctx: click.Context) -> None:
 @click.pass_context
 def help_command(ctx: click.Context) -> None:
     """Show this message and exit."""
+    click.echo(render_logo_small(ctx.obj.mode) + "\n", err=True)
     click.echo(ctx.parent.get_help())
 
 

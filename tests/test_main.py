@@ -92,6 +92,39 @@ def test_render_banner_places_icon_beside_the_wordmark():
     assert "┌┬┐" in "".join(lines)
 
 
+def test_render_logo_small_is_wordmark_only_no_icon():
+    from toolchain.main import render_logo_small
+
+    logo = render_logo_small("dark")
+    lines = logo.strip("\n").split("\n")
+    assert len(lines) == 3
+    assert "┌┬┐" in "".join(lines)
+    assert "▀" not in logo and "▄" not in logo
+
+
+def test_render_logo_small_colors_by_mode():
+    from toolchain.main import render_logo_small
+
+    dark = render_logo_small("dark")
+    contrast = render_logo_small("contrast")
+    assert dark != contrast
+    assert click.unstyle(dark) == click.unstyle(contrast)
+
+
+def test_tldr_command_shows_small_logo():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["tldr"])
+    assert result.exit_code == 0
+    assert "┌┬┐" in result.output
+
+
+def test_help_command_shows_small_logo():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["help"])
+    assert result.exit_code == 0
+    assert "┌┬┐" in result.output
+
+
 def test_mode_defaults_to_dark_and_is_accepted():
     runner = CliRunner()
     for mode in ("dark", "light", "sepia", "contrast"):
