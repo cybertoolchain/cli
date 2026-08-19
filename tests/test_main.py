@@ -139,11 +139,16 @@ def test_invalid_mode_exits_1_with_message():
     assert "Unknown --mode" in result.output
 
 
-def test_unknown_site_flag_exits_1_with_message():
+def test_unknown_site_flag_is_rejected_by_click():
+    # Choice-typed like -o/--output: Click itself rejects an out-of-list
+    # value before resolve_config ever runs. The custom "Unknown --site"
+    # message still fires for a bad TOOLCHAIN_SITE env var, which Click's
+    # parser never sees — see test_config.py's
+    # test_unknown_site_raises_user_input_error.
     runner = CliRunner()
     result = runner.invoke(cli, ["--site", "not-real", "tldr"])
-    assert result.exit_code == 1
-    assert "Unknown --site" in result.output
+    assert result.exit_code == 2
+    assert "'--site'" in result.output
 
 
 def test_tools_group_is_registered():

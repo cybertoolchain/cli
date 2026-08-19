@@ -22,14 +22,14 @@ class Site:
 
 
 SITES: dict[str, Site] = {
-    "cybertoolchain": Site(
+    "cyber": Site(
         site_base="https://cybertoolchain.github.io",
         # CloudFront in front of ctk-data-api. Swap for api.cybertoolchain.com
         # here, once, when that DNS/cert work lands — every command reads
         # this one constant.
         api_base="https://d3hvv6ete0783d.cloudfront.net",
     ),
-    "aitoolchain": Site(
+    "ai": Site(
         site_base="https://aitoolchain.io",
         api_base=None,
     ),
@@ -69,7 +69,7 @@ def resolve_config(
     """flag -> env (TOOLCHAIN_ prefix) -> default, validated once, here."""
     resolved_key = api_key or os.environ.get("TOOLCHAIN_API_KEY") or None
 
-    resolved_site_key = site or os.environ.get("TOOLCHAIN_SITE") or "cybertoolchain"
+    resolved_site_key = site or os.environ.get("TOOLCHAIN_SITE") or "cyber"
     if resolved_site_key not in SITES:
         supported = ", ".join(SITES)
         raise UserInputError(
@@ -97,7 +97,7 @@ def resolve_config(
     if resolved_timeout <= 0:
         raise UserInputError(f"--timeout must be greater than 0, got {resolved_timeout}")
 
-    resolved_mode = mode or os.environ.get("TOOLCHAIN_MODE") or "dark"
+    resolved_mode = mode or os.environ.get("TOOLCHAIN_MODE") or "sepia"
     if resolved_mode not in VALID_MODES:
         supported = ", ".join(VALID_MODES)
         raise UserInputError(

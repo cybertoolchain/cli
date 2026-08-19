@@ -7,7 +7,7 @@ import click
 
 from .cli_group import GlobalOptionGroup, set_mode_meta
 from .colors import PALETTES
-from .config import VALID_OUTPUTS, resolve_config
+from .config import SITES, VALID_OUTPUTS, resolve_config
 from .log import configure_logging
 from .models import ToolchainError
 
@@ -129,7 +129,14 @@ def render_tldr(mode: str) -> str:
 
 @click.group(cls=GlobalOptionGroup, invoke_without_command=True)
 @click.option("-k", "--api-key", envvar="TOOLCHAIN_API_KEY", default=None)
-@click.option("--site", "site_key", default=None)
+@click.option(
+    "--site",
+    "site_key",
+    default=None,
+    type=click.Choice(list(SITES)),
+    help="Which product this talks to — cyber: cybertoolchain.github.io; "
+    "ai: aitoolchain.io, no live API yet. Default: cyber (env: TOOLCHAIN_SITE).",
+)
 @click.option("-o", "--output", default=None, type=click.Choice(VALID_OUTPUTS))
 @click.option("-v", "--verbose", is_flag=True, default=False)
 @click.option("--debug", is_flag=True, default=False)
@@ -146,7 +153,7 @@ def render_tldr(mode: str) -> str:
     callback=set_mode_meta,
     help="Color palette for the banner, help menu, and JSON output: "
     "dark|light|sepia|contrast, matching the website's 4 themes "
-    "(env: TOOLCHAIN_MODE, default: dark).",
+    "(env: TOOLCHAIN_MODE, default: sepia).",
 )
 @click.pass_context
 def cli(

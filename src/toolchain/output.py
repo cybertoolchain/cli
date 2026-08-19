@@ -127,7 +127,7 @@ def format_output(
     limit: int | None = None,
     search_fields: str | None = None,
     short: bool = False,
-    mode: str = "dark",
+    mode: str = "sepia",
 ) -> str:
     if search_fields:
         data = _search_fields(data, search_fields)

@@ -21,13 +21,13 @@ def test_key_gives_api_source():
 
 
 def test_key_against_a_site_with_no_api_raises():
-    config = resolve_config(api_key="ctk_live_abc", site="aitoolchain")
-    with pytest.raises(UserInputError, match="aitoolchain has no data API yet"):
+    config = resolve_config(api_key="ctk_live_abc", site="ai")
+    with pytest.raises(UserInputError, match="ai has no data API yet"):
         resolve_source(config)
 
 
 def test_no_key_against_aitoolchain_still_gives_site_source():
-    config = resolve_config(site="aitoolchain")
+    config = resolve_config(site="ai")
     source = resolve_source(config)
     assert isinstance(source, SiteSource)
 

@@ -19,8 +19,8 @@ def set_mode_meta(ctx: click.Context, param: click.Parameter, value: str | None)
     available to get_help() below, which (being tied to the eager --help
     option) runs before the group's own callback would otherwise set
     ctx.obj. An unrecognized value here is left for resolve_config to
-    reject properly later — help output just falls back to dark."""
-    ctx.meta["mode"] = value if value in PALETTES else "dark"
+    reject properly later — help output just falls back to sepia."""
+    ctx.meta["mode"] = value if value in PALETTES else "sepia"
     return value
 
 
@@ -80,7 +80,7 @@ class GlobalOptionGroup(click.Group):
     corrective example instead of a confusing per-subcommand parse error."""
 
     def get_help(self, ctx: click.Context) -> str:
-        return colorize_help(super().get_help(ctx), ctx.meta.get("mode", "dark"))
+        return colorize_help(super().get_help(ctx), ctx.meta.get("mode", "sepia"))
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         sub_idx = None

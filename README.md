@@ -31,7 +31,7 @@ equivalent (`tools sbom`) say so in their own `--help`.
 
 ## Targeting a different product
 
-    toolchain --site aitoolchain tools list
+    toolchain --site ai tools list
 
 `aitoolchain` has no data API yet — only free site commands work against it
 until one ships.

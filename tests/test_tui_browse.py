@@ -32,6 +32,19 @@ async def test_filter_narrows_the_list():
 
 
 @pytest.mark.asyncio
+async def test_filter_highlights_the_matched_text():
+    app = ToolBrowserApp(TOOLS)
+    async with app.run_test() as pilot:
+        await pilot.click("#filter")
+        for char in "falco":
+            await pilot.press(char)
+        table = app.query_one("#tool-table")
+        cell = table.get_cell_at((0, 0))
+        assert cell.plain == "Falco"
+        assert any(span.style == "bold reverse" for span in cell.spans)
+
+
+@pytest.mark.asyncio
 async def test_selecting_a_row_sets_selected_tool():
     app = ToolBrowserApp(TOOLS)
     async with app.run_test() as pilot:
