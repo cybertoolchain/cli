@@ -33,19 +33,14 @@ calls `/v1/tools/count` for a live, server-side count.
 ## `--debug` and the httpx/httpcore logging landmine
 
 `ApiSource.curl()` is structurally leak-proof — it never references the raw
-key attribute, only `$TOOLCHAIN_API_KEY`. But `redact()` (`src/toolchain/log.py`)
-has no call site anywhere in this codebase yet, found during Task 7's review.
-If a future `--debug` enhancement enables raw `httpx`/`httpcore` DEBUG-level
-logging (e.g. `logging.getLogger("httpx").setLevel(logging.DEBUG)` or a bare
-`logging.basicConfig(level=logging.DEBUG)` that httpx's loggers pick up),
-those libraries log request headers independently of `ApiSource` — including
-the real `x-api-key` value — straight to stderr, outside this class's
-control entirely. `configure_logging()` (Task 5) only configures a logger
-named `"toolchain"` with `propagate=False`, so it does NOT currently touch
-httpx's own loggers — that's why this is a landmine and not a live bug.
-**Before wiring any future feature that touches httpx/httpcore's own
-logging, either keep it off entirely or run every line through `redact()`
-first.**
+key, only `$TOOLCHAIN_API_KEY`. But `redact()` (`src/toolchain/log.py`) has
+no call site anywhere yet. `configure_logging()` only configures a logger
+named `"toolchain"` (`propagate=False`); it does not touch httpx/httpcore's
+own loggers. If a future `--debug` enhancement ever enables their DEBUG
+logging (directly or via a bare `logging.basicConfig(level=logging.DEBUG)`),
+they'll log request headers — including the real `x-api-key` — straight to
+stderr, outside `ApiSource`'s control. **Before wiring anything that touches
+httpx/httpcore logging, keep it off or run every line through `redact()`.**
 
 ## Brand banner and `--mode`
 
