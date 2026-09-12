@@ -19,6 +19,20 @@ def current_version() -> str:
         return "0.0.0+unknown"
 
 
+def user_agent() -> str:
+    """What every request identifies itself as. Both sites sit behind
+    Cloudflare bot protection that blocks anonymous automation outright,
+    and an allow rule there admits `toolchain-cli/*` to the public JSON
+    endpoints — so a request without this header is refused with a 403
+    before it ever reaches the site. One place, so a new client cannot
+    forget it."""
+    return f"toolchain-cli/{current_version()}"
+
+
+def default_headers() -> dict[str, str]:
+    return {"User-Agent": user_agent()}
+
+
 def _version_tuple(value: str) -> tuple[int, ...]:
     parts = []
     for chunk in value.lstrip("v").split(".")[:3]:
@@ -36,7 +50,9 @@ def latest_version(*, timeout: float = 5.0) -> str | None:
     it, which is why every failure mode collapses to None rather than
     raising."""
     try:
-        response = httpx.get(_LATEST_RELEASE_URL, timeout=timeout, follow_redirects=True)
+        response = httpx.get(
+            _LATEST_RELEASE_URL, timeout=timeout, follow_redirects=True, headers=default_headers()
+        )
         response.raise_for_status()
         tag = response.json().get("tag_name", "")
     except Exception:

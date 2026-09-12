@@ -8,6 +8,15 @@ from ..source import resolve_source
 
 SERIES: tuple[str, ...] = ("head", "tail", "diff")
 
+#: The free site publishes entries per TOOL (/tool-entries/<slug>.json) and
+#: retired the bulk /entries.json this CLI read issues out of — it served the
+#: whole corpus in one request. Nothing free is keyed by issue any more.
+_NO_KEY_ISSUE_ENTRIES = (
+    "Reading an issue's entries needs an API key (-k). Without one the site "
+    "publishes entries per tool — 'toolchain tools releases <slug>' — and "
+    "'toolchain issues download <slug> --format html' fetches the rendered page."
+)
+
 
 def _qualify(series: str | None, issue: str) -> str:
     """A bare number under a series subgroup ('44' under 'tail') becomes
@@ -23,8 +32,11 @@ def _list_data(ctx: click.Context, series: str | None):
     if config.api_key:
         params = {k: v for k, v in {"series": series, "limit": config.limit}.items() if v is not None}
         return config, source.fetch("issues", **params)
-    entries = source.fetch("entries.json")
-    data = entries
+    # The site's search index is the one free listing of issues: one row per
+    # daily (Tail) issue, addressed /newsletter/<number>. Head and Diff are
+    # not in it, so a series filter for those is honestly empty here.
+    index = source.fetch("search-index.json")
+    data = [_issue_row(row) for row in index if row.get("type") == "issue"]
     if series:
         data = [row for row in data if row.get("issue_slug", "").startswith(f"{series}/")]
     if config.limit is not None:
@@ -32,15 +44,19 @@ def _list_data(ctx: click.Context, series: str | None):
     return config, data
 
 
+def _issue_row(row: dict) -> dict:
+    number = str(row.get("href", "")).rstrip("/").rsplit("/", 1)[-1]
+    sub = str(row.get("sub", ""))
+    digits = "".join(ch for ch in sub.split("·")[-1] if ch.isdigit())
+    return {
+        "issue_slug": f"tail/{number}",
+        "label": row.get("label", ""),
+        "tools": int(digits) if digits else 0,
+    }
+
+
 def _entries_no_key(source, issue: str) -> list[dict]:
-    entries = source.fetch("entries.json")
-    matches = [row for row in entries if row.get("issue_slug") == issue]
-    if not matches:
-        raise UserInputError(
-            f"No public entries found for issue '{issue}'. Run 'toolchain issues list' "
-            "to see available issue slugs."
-        )
-    return matches
+    raise UserInputError(_NO_KEY_ISSUE_ENTRIES)
 
 
 def _get_data(ctx: click.Context, issue: str):
@@ -86,6 +102,9 @@ def _read(ctx: click.Context, issue: str) -> None:
 def _browse(ctx: click.Context, series: str | None) -> None:
     from ..tui.issues_browse import IssueBrowserApp
 
+    config = get_config(ctx)
+    if not config.api_key:
+        raise UserInputError(_NO_KEY_ISSUE_ENTRIES)
     config, data = _list_data(ctx, series)
     if config.api_key:
         issues = data.get("issues", data if isinstance(data, list) else [])
@@ -140,10 +159,9 @@ def issues(ctx: click.Context) -> None:
 @click.pass_context
 @handle_errors
 def issues_list(ctx: click.Context, series) -> None:
-    """The issue index. No key: every entry that has run in a public
-    issue, grouped by issue — narrower than the full archive (no
-    paywalled entries, no assimilated summary block). With a key: the
-    real issue index. Use the GLOBAL -l/--limit (before the subcommand)
+    """The issue index. No key: the daily issues the site indexes, one
+    row each (slug, label, tool count) — Head and Diff are not listed
+    there. With a key: the real issue index. Use the GLOBAL -l/--limit (before the subcommand)
     to cap how many come back — there is no separate --limit here."""
     config, data = _list_data(ctx, series)
     emit(data, config)
@@ -154,9 +172,8 @@ def issues_list(ctx: click.Context, series) -> None:
 @click.pass_context
 @handle_errors
 def issues_get(ctx: click.Context, issue: str) -> None:
-    """One issue's public entries. No key: derived from /entries.json,
-    filtered to this issue_slug (e.g. tail/44) — a subset of the real
-    issue, not the full archive record. With a key: the full issue."""
+    """One issue's entries. Needs a key: the free site publishes entries
+    per tool ('toolchain tools releases <slug>'), not per issue."""
     config, data = _get_data(ctx, issue)
     emit(data, config)
 

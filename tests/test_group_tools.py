@@ -210,34 +210,47 @@ def test_tools_get_with_key_uses_v1_slug_path(monkeypatch):
     assert payload["latest_release"]["version"] == "commits-2026-07-11"
 
 
-def test_tools_releases_no_key_filters_entries_by_tool(monkeypatch):
+def test_tools_releases_no_key_reads_the_tools_own_entries_file(monkeypatch):
+    # /entries.json (the whole corpus in one request) is gone; the site
+    # publishes each tool's history at /tool-entries/<slug>.json.
     entries = load("site_entries.json")
 
     class StubSource:
         def fetch(self, path, **params):
-            assert path == "entries.json"
-            return entries
+            assert path == "tool-entries/nmap.json"
+            return [row for row in entries if row["name"] == "nmap"]
 
     monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
-    result = CliRunner().invoke(cli, ["tools", "releases", "nmap"])
-    assert result.exit_code == 0
+    result = CliRunner().invoke(cli, ["tools", "releases", "Nmap"])
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert len(payload) == 2
     assert all(row["name"] == "nmap" for row in payload)
 
 
 def test_tools_releases_no_key_unknown_slug_is_user_input_error(monkeypatch):
-    entries = load("site_entries.json")
+    from toolchain.models import APIError
 
     class StubSource:
         def fetch(self, path, **params):
-            assert path == "entries.json"
-            return entries
+            assert path == "tool-entries/not-a-real-tool.json"
+            raise APIError(f"404 fetching https://cybertoolchain.io/{path}")
 
     monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
     result = CliRunner().invoke(cli, ["tools", "releases", "not-a-real-tool"])
     assert result.exit_code == 1
     assert "not-a-real-tool" in result.output
+
+
+def test_tools_releases_no_key_tool_with_nothing_published_is_user_input_error(monkeypatch):
+    class StubSource:
+        def fetch(self, path, **params):
+            return []
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    result = CliRunner().invoke(cli, ["tools", "releases", "quiet-tool"])
+    assert result.exit_code == 1
+    assert "quiet-tool" in result.output
 
 
 def test_tools_releases_with_key_uses_v1_path(monkeypatch):

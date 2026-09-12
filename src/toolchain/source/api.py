@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 import httpx
 
 from ..models import APIError, NetworkError, UserInputError
+from ..versioning import default_headers
 
 
 class ApiSource:
@@ -23,7 +24,9 @@ class ApiSource:
         self._base = api_base.rstrip("/")
         self._key = api_key
         self._client = (
-            client if client is not None else httpx.Client(timeout=timeout, follow_redirects=True)
+            client
+            if client is not None
+            else httpx.Client(timeout=timeout, follow_redirects=True, headers=default_headers())
         )
 
     def _url(self, path: str) -> str:

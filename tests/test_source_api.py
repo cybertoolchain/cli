@@ -75,3 +75,10 @@ def test_curl_never_prints_the_real_key():
     assert "ctk_live_secret_value" not in dump
     assert "$TOOLCHAIN_API_KEY" in dump
     assert f"{BASE}/v1/tools/count" in dump
+
+
+def test_default_client_identifies_itself_as_the_cli():
+    from toolchain.source.api import ApiSource
+
+    source = ApiSource("https://api.example.test", "ctk_live_abc")
+    assert source._client.headers["user-agent"].startswith("toolchain-cli/")

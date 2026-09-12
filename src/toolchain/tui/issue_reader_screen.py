@@ -13,6 +13,7 @@ from textual.widgets import Footer, Header, Input, Markdown, Static
 from textual.widgets.markdown import MarkdownBlock
 from textual_image.widget import Image as InlineImage
 
+from ..versioning import default_headers
 from .reader import issue_markdown
 
 _IMAGE_FETCH_TIMEOUT = 10.0
@@ -81,7 +82,7 @@ class IssueReaderScreen(Screen):
 
     async def _load_images(self) -> None:
         async with httpx.AsyncClient(
-            timeout=_IMAGE_FETCH_TIMEOUT, follow_redirects=True
+            timeout=_IMAGE_FETCH_TIMEOUT, follow_redirects=True, headers=default_headers()
         ) as client:
             for widget_id, url, alt in self._image_specs:
                 try:
