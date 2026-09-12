@@ -5,4 +5,4 @@ from __future__ import annotations
 def test_package_importable():
     import toolchain
 
-    assert toolchain.__version__ == "0.1.0"
+    assert toolchain.__version__ == "0.3.0"

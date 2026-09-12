@@ -1,0 +1,37 @@
+[
+  {
+    "type": "page",
+    "label": "feeds",
+    "sub": "subscribe \u00b7 rss \u00b7 opml",
+    "href": "/feeds",
+    "keywords": "feeds rss"
+  },
+  {
+    "type": "tool",
+    "label": "Nmap",
+    "sub": "reconnaissance",
+    "href": "/tools/nmap",
+    "keywords": "nmap reconnaissance"
+  },
+  {
+    "type": "issue",
+    "label": "Issue 038",
+    "sub": "newsletter \u00b7 1 tools",
+    "href": "/newsletter/38",
+    "keywords": "issue 38 newsletter nmap"
+  },
+  {
+    "type": "issue",
+    "label": "Issue 042",
+    "sub": "newsletter \u00b7 1 tools",
+    "href": "/newsletter/42",
+    "keywords": "issue 42 newsletter falco"
+  },
+  {
+    "type": "issue",
+    "label": "Issue 044",
+    "sub": "newsletter \u00b7 1 tools",
+    "href": "/newsletter/44",
+    "keywords": "issue 44 newsletter nmap"
+  }
+]

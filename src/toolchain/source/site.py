@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 import httpx
 
 from ..models import APIError, NetworkError
+from ..versioning import default_headers
 
 
 class SiteSource:
@@ -22,7 +23,9 @@ class SiteSource:
     ) -> None:
         self._base = site_base.rstrip("/")
         self._client = (
-            client if client is not None else httpx.Client(timeout=timeout, follow_redirects=True)
+            client
+            if client is not None
+            else httpx.Client(timeout=timeout, follow_redirects=True, headers=default_headers())
         )
 
     def _url(self, path: str) -> str:

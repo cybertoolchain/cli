@@ -4,6 +4,7 @@ import click
 
 from ..helpers import emit, get_config, handle_errors
 from ..source import resolve_source
+from ..source.entries import newest_per_tool, published_entries
 
 
 @click.group()
@@ -39,11 +40,15 @@ def releases_list(ctx: click.Context, tools_, categories, since, until) -> None:
         }
         data = source.fetch("releases", **params)
     else:
-        entries = source.fetch("entries.json")
-        data = entries
         if tools_:
-            wanted = {t.strip().lower() for t in tools_.split(",")}
-            data = [row for row in data if row.get("name") in wanted]
+            # Per tool: the site publishes each tool's full published history
+            # at /tool-entries/<slug>.json; there is no bulk file any more.
+            data = [row for t in tools_.split(",") if t.strip()
+                    for row in published_entries(source, t.strip())]
+        else:
+            # Across the watchlist the free site lists one release per tool —
+            # its newest — so a tool that shipped twice this month shows once.
+            data = newest_per_tool(source)
         if categories:
             wanted_cats = {c.strip().lower() for c in categories.split(",")}
             data = [row for row in data if row.get("category", "").lower() in wanted_cats]
@@ -70,6 +75,6 @@ def releases_latest(ctx: click.Context) -> None:
     if config.api_key:
         data = source.fetch("releases", limit=limit)
     else:
-        entries = source.fetch("entries.json")
-        data = sorted(entries, key=lambda row: row.get("published_at", ""), reverse=True)[:limit]
+        data = sorted(newest_per_tool(source),
+                      key=lambda row: row.get("published_at", ""), reverse=True)[:limit]
     emit(data, config)

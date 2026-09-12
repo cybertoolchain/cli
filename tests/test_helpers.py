@@ -57,3 +57,14 @@ def test_handle_errors_passes_through_on_success():
         return 42
 
     assert fine() == 42
+
+
+def test_tool_slug_matches_the_sites_rule():
+    from toolchain.helpers import tool_slug
+
+    # Mirrors site/src/lib/toolSlug.ts: the address of /tools/<slug> and
+    # /tool-entries/<slug>.json, so a divergence here is a 404 there.
+    assert tool_slug("Nmap") == "nmap"
+    assert tool_slug("OWASP ZAP") == "owasp-zap"
+    assert tool_slug("Node.js  (LTS)") == "node-js-lts"
+    assert tool_slug(" --Claude Code-- ") == "claude-code"

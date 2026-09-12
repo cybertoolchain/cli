@@ -1,0 +1,29 @@
+{
+  "title": "The Cyber Toolchain \u2014 watchlist",
+  "home_page_url": "https://cybertoolchain.io/",
+  "feed_url": "https://cybertoolchain.io/tools.json",
+  "updated": "2026-08-09T22:03:18+00:00",
+  "count": 2,
+  "tools": [
+    {
+      "tool": "Nmap",
+      "category": "reconnaissance",
+      "version": "commits-2026-07-11",
+      "url": "https://github.com/nmap/nmap/compare/49a85f9c3c11...115af39aacf9",
+      "open_source": true,
+      "published_at": "2026-08-09T22:03:18+00:00",
+      "summary": "Nmap gains TLS close_notify tolerance and signal propagation to child processes with `-k`.",
+      "permalink": "https://cybertoolchain.io/tools/nmap"
+    },
+    {
+      "tool": "Falco",
+      "category": "runtime-security",
+      "version": "v0.40.0",
+      "url": "https://falco.org/docs/reference/changelog/",
+      "open_source": true,
+      "published_at": "2026-08-05T10:00:00+00:00",
+      "summary": "Falco 0.40.0 adds a new gRPC output plugin.",
+      "permalink": "https://cybertoolchain.io/tools/falco"
+    }
+  ]
+}

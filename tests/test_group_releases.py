@@ -6,6 +6,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from toolchain.main import cli
+from toolchain.models import APIError
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -14,47 +15,61 @@ def load(name: str) -> dict:
     return json.loads((FIXTURES / name).read_text())
 
 
-def test_releases_list_no_key_reads_entries_json(monkeypatch):
-    entries = load("site_entries.json")
+class SiteSource:
+    """The free site as it is now: one release per tool in /tools.json, and a
+    tool's full published history at /tool-entries/<slug>.json. /entries.json
+    is gone (404) — it served the whole corpus in one request."""
 
-    class StubSource:
-        def fetch(self, path, **params):
-            assert path == "entries.json"
-            return entries
+    def __init__(self):
+        self.paths = []
 
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    def fetch(self, path, **params):
+        self.paths.append(path)
+        if path == "tools.json":
+            return load("site_tools_feed.json")
+        if path.startswith("tool-entries/") and path.endswith(".json"):
+            slug = path[len("tool-entries/"):-len(".json")]
+            rows = [row for row in load("site_entries.json") if row["name"] == slug]
+            if not rows:
+                raise APIError(f"404 fetching https://cybertoolchain.io/{path}")
+            return rows
+        raise APIError(f"404 fetching https://cybertoolchain.io/{path}")
+
+
+def test_releases_list_no_key_reads_the_newest_release_per_tool(monkeypatch):
+    source = SiteSource()
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: source)
     result = CliRunner().invoke(cli, ["releases", "list"])
-    assert result.exit_code == 0
-    assert len(json.loads(result.output)) == 3
-
-
-def test_releases_list_filters_by_tools(monkeypatch):
-    entries = load("site_entries.json")
-
-    class StubSource:
-        def fetch(self, path, **params):
-            return entries
-
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
-    result = CliRunner().invoke(cli, ["releases", "list", "--tools", "falco"])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert len(payload) == 1
-    assert payload[0]["name"] == "falco"
+    assert source.paths == ["tools.json"]
+    # Two tools in the fixture; Nmap has two entries and lists once.
+    assert [row["tool"] for row in payload] == ["Nmap", "Falco"]
+
+
+def test_releases_list_filters_by_tools_reads_each_tools_history(monkeypatch):
+    source = SiteSource()
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: source)
+    result = CliRunner().invoke(cli, ["releases", "list", "--tools", "Nmap,falco"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert source.paths == ["tool-entries/nmap.json", "tool-entries/falco.json"]
+    assert [row["name"] for row in payload] == ["nmap", "nmap", "falco"]
+
+
+def test_releases_list_unknown_tool_is_user_input_error(monkeypatch):
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: SiteSource())
+    result = CliRunner().invoke(cli, ["releases", "list", "--tools", "not-a-real-tool"])
+    assert result.exit_code == 1
+    assert "not-a-real-tool" in result.output
 
 
 def test_releases_list_filters_by_categories(monkeypatch):
-    entries = load("site_entries.json")
-
-    class StubSource:
-        def fetch(self, path, **params):
-            return entries
-
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: SiteSource())
     result = CliRunner().invoke(cli, ["releases", "list", "--categories", "runtime-security"])
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert all(row["category"] == "runtime-security" for row in payload)
+    assert payload and all(row["category"] == "runtime-security" for row in payload)
 
 
 def test_releases_list_with_key_uses_v1_path(monkeypatch):
@@ -69,18 +84,12 @@ def test_releases_list_with_key_uses_v1_path(monkeypatch):
 
 
 def test_releases_latest_sorts_newest_first_and_applies_default_limit(monkeypatch):
-    entries = load("site_entries.json")
-
-    class StubSource:
-        def fetch(self, path, **params):
-            return entries
-
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: SiteSource())
     result = CliRunner().invoke(cli, ["releases", "latest"])
     assert result.exit_code == 0
     payload = json.loads(result.output)
     dates = [row["published_at"] for row in payload]
-    assert dates == sorted(dates, reverse=True)
+    assert dates and dates == sorted(dates, reverse=True)
 
 
 def test_releases_latest_limit_flag(monkeypatch):
@@ -89,26 +98,14 @@ def test_releases_latest_limit_flag(monkeypatch):
     # under GlobalOptionGroup (see Task 11's ledger: a bare "--limit" after
     # the subcommand is indistinguishable from a misplaced global flag).
     # So it goes BEFORE the subcommand here, like every other global flag.
-    entries = load("site_entries.json")
-
-    class StubSource:
-        def fetch(self, path, **params):
-            return entries
-
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: SiteSource())
     result = CliRunner().invoke(cli, ["--limit", "1", "releases", "latest"])
     assert result.exit_code == 0
     assert len(json.loads(result.output)) == 1
 
 
 def test_releases_list_limit_flag(monkeypatch):
-    entries = load("site_entries.json")
-
-    class StubSource:
-        def fetch(self, path, **params):
-            return entries
-
-    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: StubSource())
-    result = CliRunner().invoke(cli, ["--limit", "2", "releases", "list"])
+    monkeypatch.setattr("toolchain.groups.releases.resolve_source", lambda config: SiteSource())
+    result = CliRunner().invoke(cli, ["--limit", "1", "releases", "list", "--tools", "nmap"])
     assert result.exit_code == 0
-    assert len(json.loads(result.output)) == 2
+    assert len(json.loads(result.output)) == 1

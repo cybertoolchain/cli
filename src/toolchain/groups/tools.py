@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import click
 
-from ..helpers import emit, get_config, handle_errors
+from ..helpers import emit, get_config, handle_errors, tool_slug
 from ..models import UserInputError
 from ..source import resolve_source
+from ..source.entries import published_entries
 
 
 @click.group()
@@ -15,7 +16,7 @@ def tools() -> None:
 
 
 def _slug_of(tool_row: dict) -> str:
-    return str(tool_row.get("tool", "")).lower().replace(" ", "-")
+    return tool_slug(tool_row.get("tool", ""))
 
 
 def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[dict]:
@@ -142,8 +143,10 @@ def tools_releases(ctx: click.Context, slug: str, since, until) -> None:
         }
         data = source.fetch(f"tools/{slug}/releases", **params)
     else:
-        entries = source.fetch("entries.json")
-        data = [row for row in entries if row.get("name") == slug.lower()]
+        # The site publishes entries per tool, not in bulk: /entries.json was
+        # retired for /tool-entries/<slug>.json, which exists for every tool
+        # with a page and is empty for one we have published nothing about.
+        data = published_entries(source, slug)
         if not data:
             raise UserInputError(
                 f"No release history found for '{slug}'. Run 'toolchain tools list' to see "

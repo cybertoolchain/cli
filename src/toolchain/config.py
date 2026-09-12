@@ -23,7 +23,10 @@ class Site:
 
 SITES: dict[str, Site] = {
     "cyber": Site(
-        site_base="https://cybertoolchain.github.io",
+        # The apex, not the github.io origin: GitHub 301s the latter here
+        # anyway, and the Cloudflare rule admitting toolchain-cli/* to the
+        # JSON endpoints lives on the apex zone.
+        site_base="https://cybertoolchain.io",
         # CloudFront in front of ctk-data-api. Swap for api.cybertoolchain.com
         # here, once, when that DNS/cert work lands — every command reads
         # this one constant.

@@ -73,6 +73,13 @@ def test_default_client_follows_redirects():
     assert source._client.follow_redirects is True
 
 
+def test_default_client_identifies_itself_as_the_cli():
+    # Cloudflare blocks anonymous automation on both sites; the allow rule
+    # for the public JSON endpoints matches this prefix and nothing else.
+    source = SiteSource("https://cybertoolchain.io")
+    assert source._client.headers["user-agent"].startswith("toolchain-cli/")
+
+
 def test_curl_renders_a_get_url():
     source = SiteSource("https://cybertoolchain.github.io", client=FakeClient())
     assert source.curl("tools.json") == "curl https://cybertoolchain.github.io/tools.json"
