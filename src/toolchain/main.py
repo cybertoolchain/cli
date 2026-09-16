@@ -134,7 +134,7 @@ def render_tldr(mode: str) -> str:
     "site_key",
     default=None,
     type=click.Choice(list(SITES)),
-    help="Which product this talks to — cyber: cybertoolchain.github.io; "
+    help="Which product this talks to — cyber: cybertoolchain.io; "
     "ai: aitoolchain.io, no live API yet. Default: cyber (env: TOOLCHAIN_SITE).",
 )
 @click.option("-o", "--output", default=None, type=click.Choice(VALID_OUTPUTS))
