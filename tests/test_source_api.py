@@ -34,6 +34,36 @@ def test_401_raises_user_input_error():
         source.fetch("tools")
 
 
+def test_403_requires_researcher_explains_the_plan():
+    # What the data API answers for a key whose owner's plan has lapsed or
+    # dropped below Researcher.
+    body = {
+        "error": "requires-researcher",
+        "message": "API and MCP access needs a Researcher or Business "
+        "subscription. This key's account is on a lower plan.",
+    }
+    client = FakeClient(responses={f"{BASE}/v1/tools": FakeResponse(403, body)})
+    source = ApiSource(BASE, "ctk_live_abc", client=client)
+    with pytest.raises(UserInputError) as exc:
+        source.fetch("tools")
+    text = str(exc.value)
+    assert "Researcher or Business" in text
+    assert "account page" in text
+    assert "403" not in text
+
+
+def test_403_without_a_known_code_does_not_blame_the_plan():
+    # Anything else answering 403 (the CDN, a WAF) is not a plan problem, so
+    # it must not claim one — but a bare status code is still no answer.
+    client = FakeClient(
+        responses={f"{BASE}/v1/tools": FakeResponse(403, invalid_json=True)}
+    )
+    source = ApiSource(BASE, "ctk_live_abc", client=client)
+    with pytest.raises(APIError, match="refused") as exc:
+        source.fetch("tools")
+    assert "Researcher" not in str(exc.value)
+
+
 def test_429_raises_api_error():
     client = FakeClient(responses={f"{BASE}/v1/tools": FakeResponse(429, {})})
     source = ApiSource(BASE, "ctk_live_abc", client=client)

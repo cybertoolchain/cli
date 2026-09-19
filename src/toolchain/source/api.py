@@ -47,6 +47,8 @@ class ApiSource:
                 "The API key was rejected (missing, revoked, or unknown). "
                 "Get a new one from your account page."
             )
+        if response.status_code == 403:
+            raise self._forbidden(response, url)
         if response.status_code == 429:
             raise APIError("Rate limit exceeded for this key. Try again later.")
         if response.status_code >= 400:
@@ -55,6 +57,25 @@ class ApiSource:
             return response.json()
         except json.JSONDecodeError as exc:
             raise APIError(f"{url} did not return valid JSON") from exc
+
+    @staticmethod
+    def _forbidden(response: Any, url: str) -> Exception:
+        # The key is valid but its owner's plan no longer includes the API
+        # (a lapse or a downgrade). Only that code is blamed on the plan: a
+        # 403 from the CDN or a WAF is not something a renewal fixes.
+        try:
+            body = response.json()
+        except ValueError:
+            body = {}
+        if isinstance(body, dict) and body.get("error") == "requires-researcher":
+            message = body.get("message") or (
+                "API access needs a Researcher or Business subscription."
+            )
+            return UserInputError(
+                f"{message} Renew or upgrade on your account page, "
+                "then run the command again."
+            )
+        return APIError(f"Access to {url} was refused (HTTP 403).")
 
     def curl(self, path: str, **params: Any) -> str:
         url = self._url(path)
