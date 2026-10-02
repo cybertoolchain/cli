@@ -84,7 +84,7 @@ CLI would generate, as a reminder to re-run the above.
 ## Development
 
     uv run pytest
-    git config core.hooksPath .githooks   # secret-scan staged changes (needs gitleaks)
+    sh .githooks/install.sh   # copies the secret-scan pre-commit hook into .git/hooks (needs gitleaks)
 
 TDD throughout: every command's tests stub `resolve_source` with a fake
 `Source`, so the suite never touches the network.
