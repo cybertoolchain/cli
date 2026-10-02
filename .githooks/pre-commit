@@ -1,9 +1,20 @@
 #!/bin/sh
 # Secret scan of staged changes. Versioned in .githooks/; enable with:
 #   git config core.hooksPath .githooks
-# Skips with a warning (exit 0) when gitleaks is missing so CI and bot commits never break.
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "pre-commit: gitleaks not installed, skipping secret scan (brew install gitleaks)" >&2
-  exit 0
+# Fails closed: any non-zero exit from gitleaks (leak found or scanner error) blocks the commit.
+# gitleaks is looked up on PATH and in the usual Homebrew locations (launchd jobs run with a thin PATH).
+GL=$(command -v gitleaks 2>/dev/null)
+if [ -z "$GL" ]; then
+  for p in /opt/homebrew/bin/gitleaks /usr/local/bin/gitleaks; do
+    if [ -x "$p" ]; then GL=$p; break; fi
+  done
 fi
-exec gitleaks git --pre-commit --staged --redact --no-banner
+if [ -z "$GL" ]; then
+  if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
+    echo "pre-commit: gitleaks not found, skipping secret scan in CI" >&2
+    exit 0
+  fi
+  echo "pre-commit: gitleaks not found - run 'brew install gitleaks', or commit with --no-verify deliberately" >&2
+  exit 1
+fi
+"$GL" git --pre-commit --staged --redact --no-banner || exit 1
