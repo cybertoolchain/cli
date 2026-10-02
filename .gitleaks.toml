@@ -1,10 +1,22 @@
-# Extends the default gitleaks ruleset. Allowlist only known fixture false positives.
+# Extends the default gitleaks ruleset. Each allowlist below is scoped to ONE rule and to exact,
+# anchored file paths that hold known fake/example values. A real secret in any other file, or a
+# different rule firing in these files, is still reported.
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Fake credentials used as redaction-test fixtures"
+[[allowlists]]
+description = "Known fake/example curl-auth-header values in fixture and data files"
+targetRules = ["curl-auth-header"]
 paths = [
-  '''tests/test_log\.py''',
-  '''docs/superpowers/plans/2026-08-18-toolchain-cli\.md''',
+  '''^docs/superpowers/plans/2026\-08\-18\-toolchain\-cli\.md$''',
+  '''^tests/test_log\.py$''',
 ]
+
+[[allowlists]]
+description = "Known fake/example generic-api-key values in fixture and data files"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^docs/superpowers/plans/2026\-08\-18\-toolchain\-cli\.md$''',
+  '''^tests/test_log\.py$''',
+]
+
