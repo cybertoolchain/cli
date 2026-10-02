@@ -1,0 +1,10 @@
+# Extends the default gitleaks ruleset. Allowlist only known fixture false positives.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake credentials used as redaction-test fixtures"
+paths = [
+  '''tests/test_log\.py''',
+  '''docs/superpowers/plans/2026-08-18-toolchain-cli\.md''',
+]
