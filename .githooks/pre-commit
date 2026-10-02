@@ -1,8 +1,8 @@
 #!/bin/sh
-# Secret scan of staged changes. Versioned in .githooks/; enable with:
-#   git config core.hooksPath .githooks
-# Fails closed: any non-zero exit from gitleaks (leak found or scanner error) blocks the commit.
-# gitleaks is looked up on PATH and in the usual Homebrew locations (launchd jobs run with a thin PATH).
+# secret-scan hook: gitleaks over the staged changes. Source of truth is .githooks/pre-commit;
+# `sh .githooks/install.sh` COPIES it to .git/hooks/ so a checked-out branch cannot change what runs.
+# Fails closed: a leak, a gitleaks crash, or a missing binary all block the commit.
+# (`git commit --no-verify` still bypasses any local hook; the CI scan is the enforcing control.)
 GL=$(command -v gitleaks 2>/dev/null)
 if [ -z "$GL" ]; then
   for p in /opt/homebrew/bin/gitleaks /usr/local/bin/gitleaks; do
@@ -10,11 +10,10 @@ if [ -z "$GL" ]; then
   done
 fi
 if [ -z "$GL" ]; then
-  if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
-    echo "pre-commit: gitleaks not found, skipping secret scan in CI" >&2
-    exit 0
-  fi
   echo "pre-commit: gitleaks not found - run 'brew install gitleaks', or commit with --no-verify deliberately" >&2
   exit 1
 fi
-"$GL" git --pre-commit --staged --redact --no-banner || exit 1
+"$GL" git --pre-commit --staged --redact --no-banner || {
+  echo "pre-commit: gitleaks reported a leak or failed - commit blocked (fix it, or commit with --no-verify deliberately)" >&2
+  exit 1
+}

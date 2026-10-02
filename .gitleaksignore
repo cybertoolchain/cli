@@ -1,0 +1,6 @@
+# Known fake/example values only, one line-exact fingerprint per finding (file:rule:line).
+# A new secret in these files on any other line, or in any other file, is still reported.
+# After editing a listed fixture, regenerate (the hook blocks until you do):
+#   gitleaks dir . --exit-code 0 -f json -r - | jq -r '.[] | "\(.File):\(.RuleID):\(.StartLine)"' | sort -u
+docs/superpowers/plans/2026-08-18-toolchain-cli.md:curl-auth-header:588
+tests/test_log.py:curl-auth-header:10
