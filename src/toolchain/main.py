@@ -170,7 +170,13 @@ def cli(
     search_fields: str | None,
     mode: str | None,
 ) -> None:
-    """The Cyber Toolchain / aitoolchain command-line client."""
+    """The Cyber Toolchain / aitoolchain command-line client.
+
+    A toolchain is when the stack connects: the tools you run and how they
+    hand work to each other, so when one tool changes, your whole chain
+    changes. More at https://cybertoolchain.io/toolchain and
+    https://aitoolchain.io/toolchain.
+    """
     try:
         ctx.obj = resolve_config(
             api_key=api_key,

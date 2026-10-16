@@ -157,3 +157,13 @@ def test_tools_group_is_registered():
     result = CliRunner().invoke(cli, ["tools", "--help"])
     assert result.exit_code == 0
     assert "list" in result.output
+
+
+def test_help_defines_a_toolchain_in_the_sites_words():
+    # The sites own one definition of the word; the CLI named after it says
+    # the same thing and points at the page that explains it.
+    result = CliRunner().invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    out = " ".join(click.unstyle(result.output).split())
+    assert "A toolchain is when the stack connects" in out
+    assert "/toolchain" in out
