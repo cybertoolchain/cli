@@ -29,7 +29,7 @@ toolchain = "toolchain.main:main"
 toolchain = "src/toolchain"
 
 [tool.setuptools.package-data]
-toolchain = ["py.typed", "assets/*.png"]
+toolchain = ["py.typed", "assets/*.png", "status_vocab.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
