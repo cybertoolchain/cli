@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "flag": {"python": "TCT_STATUS_VOCAB", "site": "PUBLIC_STATUS_VOCAB", "on": "v2"},
+  "day": "{d} {mon}",
+  "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  "labels": {
+    "supported": "Checked {day}",
+    "suggested": "Our best guess",
+    "contested": "Under review",
+    "stale": "Checked {day}, page changed since",
+    "absent": "No documented match",
+    "unknown": "Not checked yet"
+  },
+  "undated": {
+    "supported": "Checked",
+    "stale": "Checked, page changed since"
+  }
+}
