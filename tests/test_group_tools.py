@@ -382,3 +382,49 @@ def test_tools_browse_is_registered_and_has_help():
     result = CliRunner().invoke(cli, ["tools", "browse", "--help"])
     assert result.exit_code == 0
     assert "Interactively" in result.output
+
+
+# tool_type is a list of every form a tool ships in ("cli" and "service"), and
+# an older payload may still carry the single string. Both must filter, and a
+# row with no tool_type at all must never match.
+def _typed_site_data() -> dict:
+    site_data = load("site_tools.json")
+    site_data["tools"][0]["tool_type"] = ["cli", "library"]
+    site_data["tools"][1]["tool_type"] = "service"
+    site_data["tools"].append({"tool": "Plain", "category": "misc"})
+    return site_data
+
+
+def _no_key_tools(monkeypatch, *args):
+    site_data = _typed_site_data()
+
+    class StubSource:
+        def fetch(self, path, **params):
+            return site_data
+
+    monkeypatch.setattr("toolchain.groups.tools.resolve_source", lambda config: StubSource())
+    return CliRunner().invoke(cli, ["tools", *args])
+
+
+def test_tools_list_no_key_tool_type_matches_a_tool_that_ships_in_several_forms(monkeypatch):
+    result = _no_key_tools(monkeypatch, "list", "--tool_type", "library")
+    assert result.exit_code == 0
+    assert [row["tool"] for row in json.loads(result.output)["tools"]] == ["Nmap"]
+
+
+def test_tools_list_no_key_tool_type_still_matches_a_single_string(monkeypatch):
+    result = _no_key_tools(monkeypatch, "list", "--tool_type", "service")
+    assert result.exit_code == 0
+    assert [row["tool"] for row in json.loads(result.output)["tools"]] == ["Falco"]
+
+
+def test_tools_list_no_key_tool_type_is_a_whole_value_not_a_substring(monkeypatch):
+    result = _no_key_tools(monkeypatch, "list", "--tool_type", "cl")
+    assert result.exit_code == 0
+    assert json.loads(result.output)["tools"] == []
+
+
+def test_tools_count_no_key_applies_the_tool_type_filter_to_lists(monkeypatch):
+    result = _no_key_tools(monkeypatch, "count", "--tool_type", "cli")
+    assert result.exit_code == 0
+    assert json.loads(result.output)["total"] == 1

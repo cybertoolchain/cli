@@ -19,6 +19,18 @@ def _slug_of(tool_row: dict) -> str:
     return tool_slug(tool_row.get("tool", ""))
 
 
+def _tool_types(tool_row: dict) -> list[str]:
+    """Every form a tool ships in. The API returns tool_type as a list (a tool
+    can be a CLI and a service at once); an older payload carries the single
+    string, and a row with none carries nothing."""
+    value = tool_row.get("tool_type")
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        return [item for item in value if isinstance(item, str)]
+    return []
+
+
 def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[dict]:
     """Client-side equivalent of the API's query params, for the no-key
     path where the fetched payload is a static tools.json — a query string
@@ -38,7 +50,7 @@ def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[di
         # /v1/tools response does. So this filter can never match anything
         # in the no-key path; that's a real limitation of the free data,
         # not a bug in this filter.
-        rows = [row for row in rows if row.get("tool_type") == tool_type]
+        rows = [row for row in rows if tool_type in _tool_types(row)]
     if q is not None:
         needle = q.lower()
         rows = [row for row in rows if needle in str(row.get("tool", "")).lower()]
