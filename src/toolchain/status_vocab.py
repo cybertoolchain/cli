@@ -7,7 +7,7 @@ which is the only place the words are spelled; the generator's parity test and
 
 Dark: nothing the CLI prints changes until `TCT_STATUS_VOCAB=v2` is set. `label()` always
 speaks the vocabulary; `reader_text()` hands back the old string while the flag is off.
-`unknown` ("Not checked yet") is never folded into `absent` ("No documented match").
+`unknown` ("We haven’t looked yet") is never folded into `absent` ("No documented match").
 """
 from __future__ import annotations
 

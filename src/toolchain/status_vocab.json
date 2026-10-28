@@ -9,7 +9,7 @@
     "contested": "Under review",
     "stale": "Checked {day}, page changed since",
     "absent": "No documented match",
-    "unknown": "Not checked yet"
+    "unknown": "We haven’t looked yet"
   },
   "undated": {
     "supported": "Checked",
