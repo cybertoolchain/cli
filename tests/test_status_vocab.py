@@ -11,7 +11,7 @@ from toolchain import status_vocab
 
 #: The generator's tct/tests/test_status_vocab_parity.py pins this same digest.
 #: Change the vocabulary there first, copy the file here, update both.
-PINNED_DIGEST = "c93ff75082d1d09ebffc3c3e8a0aa4311e5716f4920d7e97dffd20ba9503e4d2"
+PINNED_DIGEST = "ea40b6967b03a819338a6b9a7a7c81661526dc240d8bf5bc194230b48cb14cb7"
 
 
 def test_copy_matches_the_generator_canonical_file():
@@ -31,7 +31,7 @@ def test_six_statuses_in_order():
     ("stale", "2026-10-03", "Checked 3 Oct, page changed since"),
     ("stale", "junk", "Checked, page changed since"),
     ("absent", None, "No documented match"),
-    ("unknown", None, "Not checked yet"),
+    ("unknown", None, "We haven’t looked yet"),
 ])
 def test_labels(status, when, text):
     assert status_vocab.label(status, when) == text
@@ -51,4 +51,4 @@ def test_dark_by_default(monkeypatch):
     monkeypatch.delenv("TCT_STATUS_VOCAB", raising=False)
     assert status_vocab.reader_text("old words", "unknown") == "old words"
     monkeypatch.setenv("TCT_STATUS_VOCAB", "v2")
-    assert status_vocab.reader_text("old words", "unknown") == "Not checked yet"
+    assert status_vocab.reader_text("old words", "unknown") == "We haven’t looked yet"
