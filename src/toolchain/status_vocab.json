@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "flag": {"python": "TCT_STATUS_VOCAB", "site": "PUBLIC_STATUS_VOCAB", "on": "v2"},
   "day": "{d} {mon}",
   "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
@@ -14,5 +14,32 @@
   "undated": {
     "supported": "Checked",
     "stale": "Checked, page changed since"
+  },
+  "words": {
+    "order": ["corrected", "under_review", "disagree", "stale", "not_checked", "ran_it", "saw_it", "documented", "summary"],
+    "labels": {
+      "corrected": "Corrected",
+      "under_review": "Under review",
+      "disagree": "Sources disagree",
+      "stale": "Stale",
+      "not_checked": "Not checked yet",
+      "ran_it": "We ran it",
+      "saw_it": "Saw it",
+      "documented": "Documented",
+      "summary": "Our summary"
+    },
+    "marks": {
+      "disagree": "Sources disagree",
+      "three": "Three sources",
+      "two": "Two sources",
+      "types": "Release note + docs",
+      "one": "One source"
+    },
+    "gates": {
+      "stale_after_days": 7,
+      "ran_within_days": 90,
+      "interface_origins": ["api", "cli", "mcp", "interface"],
+      "pair_origins": ["release_note", "docs"]
+    }
   }
 }

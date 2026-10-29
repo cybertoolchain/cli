@@ -14,9 +14,9 @@ def test_defaults_to_cyber_site():
     assert config.site.api_base is not None
 
 
-def test_ai_site_has_no_api_base_yet():
+def test_ai_site_uses_existing_data_api():
     config = resolve_config(site="ai")
-    assert config.site.api_base is None
+    assert config.site.api_base == "https://d38pi3sovb96lh.cloudfront.net"
     assert config.site.site_base == "https://aitoolchain.io"
 
 

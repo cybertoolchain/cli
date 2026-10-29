@@ -266,3 +266,23 @@ def tools_browse(ctx: click.Context) -> None:
     selected = app.run()
     if selected is not None:
         click.echo(f"{selected.get('tool')}: {selected.get('url', selected.get('docs_url', ''))}")
+
+
+@click.command('claims')
+@click.argument('slug')
+@click.option('-j', '--json', 'as_json', is_flag=True, help='Return the canonical receipt JSON.')
+@click.pass_context
+@handle_errors
+def claims(ctx: click.Context, slug: str, as_json: bool) -> None:
+    """Each feature's reader word and full supporting evidence."""
+    from dataclasses import replace
+    import re
+    config = get_config(ctx)
+    if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', slug):
+        raise UserInputError('Use a tool slug from toolchain tools list.')
+    source = resolve_source(config)
+    path = f'tools/{slug}/claims' if config.api_key else f'claims/{slug}.json'
+    if config.debug:
+        click.echo(source.curl(path), err=True)
+    data = source.fetch(path)
+    emit(data, replace(config, output='json') if as_json else config)

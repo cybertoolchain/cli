@@ -132,6 +132,11 @@ def format_output(
     if search_fields:
         data = _search_fields(data, search_fields)
 
+    if fmt != "json" and isinstance(data, dict) and isinstance(data.get("claims"), dict):
+        # One feature per row; evidence arrays are never mistaken for features.
+        data = [{"feature_id": feature_id, **{key: row.get(key) for key in
+                 ("claim_id", "revision", "word", "detail", "source_mark", "checked_at")}}
+                for feature_id, row in data["claims"].items()]
     items = extract_items(data)
     if items is not None and limit is not None:
         truncated = items[:limit]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import NotRequired, TypedDict
+
 
 class ToolchainError(Exception):
     """Base of every error the CLI raises deliberately. Never raise bare."""
@@ -24,3 +26,18 @@ class NetworkError(ToolchainError):
     """Connection refused, timeout, DNS failure."""
 
     exit_code = 3
+
+
+class ClaimReceipt(TypedDict):
+    claim_id: str
+    revision: NotRequired[int | None]
+    word: str
+    detail: str | None
+    source_mark: str
+    checked_at: str | None
+    evidence: list[dict]
+
+
+class ToolClaims(TypedDict):
+    tool: str
+    claims: dict[str, ClaimReceipt]
