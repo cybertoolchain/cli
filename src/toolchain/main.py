@@ -217,6 +217,11 @@ from .groups.tools import tools as tools_group
 
 cli.add_command(tools_group, name="tools")
 
+from .groups.history import history as history_command
+
+cli.add_command(history_command, name="history")
+tools_group.add_command(history_command, name="history")
+
 from .groups.releases import releases as releases_group
 
 cli.add_command(releases_group, name="releases")
