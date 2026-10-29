@@ -141,3 +141,25 @@ def test_table_includes_correction_decisions_and_current_markers(monkeypatch, ou
     result = CliRunner().invoke(cli, ['--api-key', 'fixture-key', '--output', output, 'history', 'vendor-tool'])
     assert result.exit_code == 0 and 'c-one@4' in result.output and 'scope corrected' in result.output
     assert 'c-one@2' in result.output
+
+
+@pytest.mark.parametrize('status,label', [('contested', 'Under review'), ('absent', 'No documented match')])
+def test_history_uses_the_canonical_reader_status_label(monkeypatch, status, label):
+    class Source:
+        def fetch(self, *args, **kwargs):
+            return {'claims': [{'claim_id': 'c-one', 'revision': 4, 'status': status}]}
+
+    monkeypatch.setattr('toolchain.groups.history.resolve_source', lambda config: Source())
+    result = CliRunner().invoke(cli, ['--api-key', 'fixture-key', 'history', 'vendor-tool'])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)['claims'][0]['label'] == label
+
+
+def test_invalid_history_status_is_not_a_reader_fact(monkeypatch):
+    class Source:
+        def fetch(self, *args, **kwargs):
+            return {'claims': [{'claim_id': 'c-one', 'revision': 4, 'status': 'candidate'}]}
+
+    monkeypatch.setattr('toolchain.groups.history.resolve_source', lambda config: Source())
+    result = CliRunner().invoke(cli, ['--api-key', 'fixture-key', 'history', 'vendor-tool'])
+    assert result.exit_code == 2

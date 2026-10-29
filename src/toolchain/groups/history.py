@@ -7,6 +7,7 @@ import click
 from ..helpers import emit, get_config, handle_errors, tool_slug
 from ..models import APIError, UserInputError
 from ..source import resolve_source
+from ..status_vocab import STATUSES, label as status_label
 
 _CLAIM_FIELDS = ("claim_id", "revision", "subject", "object", "status", "known_from")
 _DECISION_FIELDS = ("claim_id", "revision", "date", "status", "method", "origin",
@@ -23,6 +24,11 @@ def _public_row(row: dict, fields: tuple[str, ...]) -> dict:
         if key != "revision" and value is not None:
             if not isinstance(value, str) or any(ord(c) < 32 and c not in '\n\t' for c in value):
                 raise APIError("The history response has an invalid public value.")
+    if "status" in result:
+        if result["status"] not in STATUSES:
+            raise APIError("The history response has an invalid reader status.")
+        # This new command has no legacy label; use the shared vocabulary.
+        result["label"] = status_label(result["status"], result.get("known_from") or result.get("date"))
     result["marker"] = f"{cid}@{revision}"
     return result
 
