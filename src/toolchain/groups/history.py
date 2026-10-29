@@ -16,7 +16,7 @@ _DECISION_FIELDS = ("claim_id", "revision", "date", "status", "method", "origin"
 
 def _public_row(row: dict, fields: tuple[str, ...]) -> dict:
     cid, revision = row.get("claim_id"), row.get("revision")
-    if (not isinstance(cid, str) or not re.fullmatch(r"c-[A-Za-z0-9_-]+", cid)
+    if (not isinstance(cid, str) or not re.fullmatch(r"clm_[0-9a-f]{32}", cid)
             or type(revision) is not int or revision < 1):
         raise APIError("The history response has an invalid claim revision.")
     result = {key: row[key] for key in fields if key in row}
