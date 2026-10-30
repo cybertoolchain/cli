@@ -38,6 +38,8 @@ No API key: reads the free data already published on the site.
     toolchain issues tail list          # just the tail series
     toolchain issues                    # interactive browser (Ctrl+C to cancel)
     toolchain search "runtime security"
+    toolchain claims nmap --json        # each feature and its full evidence
+    toolchain -o table claims nmap       # one reader word per feature
     toolchain version                   # installed version, and whether a newer one shipped
     toolchain update                    # upgrade a global 'uv tool install' in place
 
@@ -54,8 +56,15 @@ equivalent (`tools sbom`) say so in their own `--help`.
 
     toolchain --site ai tools list
 
-`aitoolchain` has no data API yet — only free site commands work against it
-until one ships.
+Both products support the free site and keyed data API backends.
+
+`toolchain claims <slug> [--json]` reads the public full receipt for each
+feature without a key, or the same projection from `/v1/tools/<slug>/claims`
+with one. JSON retains the claim ID, accepted revision when available, reader
+word, detail, source mark, check date, and every public evidence ID, source
+URL, quote, vendor marker, capture date, and span. Missing or changed input
+receipts stay unchecked; no accepted revision is invented. Global `-o table`,
+`-o csv`, and `-o tsv` show one row per feature; `--json` selects canonical JSON.
 
 ## Global options
 

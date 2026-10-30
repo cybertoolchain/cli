@@ -34,7 +34,7 @@ SITES: dict[str, Site] = {
     ),
     "ai": Site(
         site_base="https://aitoolchain.io",
-        api_base=None,
+        api_base="https://d38pi3sovb96lh.cloudfront.net",
     ),
 }
 

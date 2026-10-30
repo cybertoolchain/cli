@@ -21,7 +21,9 @@ def test_key_gives_api_source():
 
 
 def test_key_against_a_site_with_no_api_raises():
-    config = resolve_config(api_key="ctk_live_abc", site="ai")
+    from dataclasses import replace
+    from toolchain.config import Site
+    config = replace(resolve_config(api_key="ctk_live_abc", site="ai"), site=Site("https://example.com", None))
     with pytest.raises(UserInputError, match="ai has no data API yet"):
         resolve_source(config)
 
@@ -59,3 +61,9 @@ def test_no_cache_flag_returns_the_source_directly():
     config = resolve_config(cache=False)
     source = resolve_source(config)
     assert isinstance(source, SiteSource)
+
+
+def test_key_against_ai_uses_actual_existing_api():
+    source = resolve_source(resolve_config(api_key="test-key", site="ai"))
+    assert isinstance(source, ApiSource)
+    assert source._base == "https://d38pi3sovb96lh.cloudfront.net"
