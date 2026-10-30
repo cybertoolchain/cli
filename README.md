@@ -1,5 +1,7 @@
 # toolchain
 
+`toolchain history <tool>` (also `toolchain tools history <tool>`) shows breaking-change claims and their correction history. JSON includes each `claim_id` and `revision`; table output includes `claim_id@revision`. With no API key it reads the selected site's public claim ledger; a key uses the live history endpoint. An unavailable ledger is an error, and an older API without claim markers never counts as a successful revision readback.
+
 Command-line client for The Cyber Toolchain (and, once it has a data API,
 aitoolchain).
 
