@@ -213,9 +213,15 @@ def help_command(ctx: click.Context) -> None:
     click.echo(ctx.parent.get_help())
 
 
-from .groups.tools import tools as tools_group
+from .groups.tools import claims as claims_command, tools as tools_group
 
 cli.add_command(tools_group, name="tools")
+cli.add_command(claims_command, name="claims")
+
+from .groups.history import history as history_command
+
+cli.add_command(history_command, name="history")
+tools_group.add_command(history_command, name="history")
 
 from .groups.releases import releases as releases_group
 
