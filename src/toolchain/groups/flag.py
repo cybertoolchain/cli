@@ -19,10 +19,11 @@ from ..models import UserInputError
 @click.option('-P', '--proposal', required=True, help='Typed JSON value, such as {"value":"provides_server"}.')
 @click.option('-T', '--tool', help='Canonical tool slug; required by some published targets.')
 @click.option('-n', '--note', help='Optional explanation, without personal or private details.')
-@click.option('-e', '--evidence-url', help='Public evidence URL; no file uploads.')
+@click.option('-e', '--evidence-url', help='Public evidence URL.')
+@click.option('-a','--attachment',multiple=True,type=click.Path(exists=True,dir_okay=False),help='Attach a screenshot or document (up to three; 8 MiB each).')
 @click.pass_context
 @handle_errors
-def flag(ctx, claim_id, claim_rev, observed_hash, kind, predicate, proposal, tool, note, evidence_url):
+def flag(ctx, claim_id, claim_rev, observed_hash, kind, predicate, proposal, tool, note, evidence_url, attachment):
     """Report a published fact; a receipt means stored for review, never published.
 
     API keys admit the request but do not identify the report or boost its weight.
@@ -37,4 +38,9 @@ def flag(ctx, claim_id, claim_rev, observed_hash, kind, predicate, proposal, too
                 kind=kind, predicate=predicate, proposal=value)
     body.update({k: v for k, v in {'tool': tool, 'note': note, 'evidence_url': evidence_url}.items() if v is not None})
     config = get_config(ctx)
-    emit(FeedbackClient(config).submit(body).receipt, config)
+    from ..attachments import validate_paths, upload
+    validate_paths(attachment)
+    submission=FeedbackClient(config).submit(body)
+    if attachment:
+        upload(config,submission,attachment)
+    emit(submission.receipt, config)
