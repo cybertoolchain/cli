@@ -1,0 +1,58 @@
+# Typed corrections
+
+`toolchain flag` reports a published fact for review on either brand. It needs the
+exact `claim_id`, `claim_rev` (at least one) and `claim_hash` shown by a supported
+published fact surface; pass `claim_hash` as `--observed-hash`. Never infer a
+revision from the tool name or replace a missing revision with zero.
+
+```sh
+toolchain --site cyber flag --claim-id "$CLAIM_ID" --claim-rev "$CLAIM_REV" \
+  --observed-hash "$CLAIM_HASH" --tool example --kind wrong --predicate mcp \
+  --proposal '{"value":"provides_server","url":"https://example.com/docs/mcp"}'
+```
+
+Set `TOOLCHAIN_API_KEY` to your account API key before calling the command. Use
+`--site ai` for an AI Toolchain fact. A key needs Researcher or Business access on
+the selected brand. This does not change the CLI's existing read API selection.
+
+`--kind` accepts wrong, missing, outdated or unclear. `--predicate` accepts mcp,
+api, capability, feature or price. `--proposal` takes that predicate's JSON shape,
+validated again by the server against the exact published fact. Optional `--note`
+is limited to 500 characters; `--evidence-url` is a public URL. File attachments
+are not supported by this release. Do not put personal details, credentials or
+private customer information in notes, proposal text or URLs.
+
+The key only admits and limits the request. It is not an account session: the
+stored report carries no account or key identity, counts in the same anonymous
+bucket as other unlinked reports, and keeps day-level dates. It does not appear
+in the account's My Requests. `received` with `persisted: true` means the report
+was stored for review; it is not proof of a published correction.
+
+The client checks the versioned capability endpoint before writing. A missing,
+older, disabled or mismatched capability refuses the operation without a POST;
+it never falls back to legacy feedback. Writes are never cached or automatically
+retried, and redirects are not followed. A timeout after a POST means delivery is
+unknown, not that nothing was stored. Server error bodies and credentials are
+never printed by this write client, including with `--debug`.
+
+A random ownership capability exists in memory for the request. Internal callers
+can reuse it for an idempotent retry; the CLI does not print or save it, and this
+release has no CLI edit, withdrawal, deletion or attachment command. Losing that
+capability cannot be repaired by presenting the API key. Future attachment support
+must authenticate possession separately, without linking the report to the key.
+
+## Separate activation and release
+
+The backend and hosted MCP deploy independently of this CLI package. Backend
+`CTK_AGENT_FEEDBACK_ENABLED=1` remains off by default; MCP's existing queue switch
+is separate. Prepare and verify the billing consumer before enabling typed MCP
+sends. No permission expansion is needed for MCP: it continues to send only to
+its existing queue. Both brands' configured subscriber endpoint is the shared
+`https://api.cybertoolchain.io`; the selected brand is explicit and verified in
+every capability and persistence receipt.
+
+Before activation, verify the approved backend package, public canonical claim
+artifacts, storage/checkpoint readiness, existing front-door header forwarding,
+rate limits, and both-brand receipts. Local tests are not deployment receipts.
+This change does not release the CLI package, enable the flags or submit real
+reports.

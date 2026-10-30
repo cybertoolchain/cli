@@ -243,6 +243,11 @@ cli.add_command(version_command, name="version")
 cli.add_command(update_command, name="update")
 
 
+from .groups.flag import flag as flag_command
+
+cli.add_command(flag_command, name="flag")
+
+
 def main() -> None:
     try:
         cli(standalone_mode=False)
