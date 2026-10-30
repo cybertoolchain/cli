@@ -31,7 +31,10 @@ was stored for review; it is not proof of a published correction.
 The client checks the versioned capability endpoint before writing. A missing,
 older, disabled or mismatched capability refuses the operation without a POST;
 it never falls back to legacy feedback. Writes are never cached or automatically
-retried, and redirects are not followed. A timeout after a POST means delivery is
+retried, and redirects are not followed. The client hashes the exact JSON body
+bytes for the configured CloudFront origin signature. A generic edge refusal is
+not reported as a subscription problem; that explanation requires a matching
+versioned, brand-specific application error. A timeout after a POST means delivery is
 unknown, not that nothing was stored. Server error bodies and credentials are
 never printed by this write client, including with `--debug`.
 

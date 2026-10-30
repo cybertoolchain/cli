@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 import re
 import secrets
@@ -88,9 +89,16 @@ class FeedbackClient:
                 or capabilities.get('receipt') != 'persisted-report'
                 or capabilities.get('identity') != 'unlinked' or capabilities.get('time_resolution') != 'day'):
             raise APIError('This server does not support typed corrections yet; no report was sent.')
+        # CloudFront OAC signs a Function URL POST using the viewer-provided
+        # digest. Serialize exactly once; hash and send those same UTF-8 bytes.
+        body = json.dumps({'brand': brand, 'report': report, 'ownership_token': token},
+                          ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
         try:
-            response = client.post(base, json={'brand': brand, 'report': report, 'ownership_token': token},
-                                   headers={'x-api-key': self.config.api_key}, follow_redirects=False)
+            response = client.post(base, content=body,
+                                   headers={'x-api-key': self.config.api_key,
+                                            'content-type': 'application/json',
+                                            'x-amz-content-sha256': hashlib.sha256(body).hexdigest()},
+                                   follow_redirects=False)
         except httpx.HTTPError:
             # Do not retry a POST or echo exception/request bodies. The client has
             # no authoritative receipt; a timeout is not proof that nothing landed.
@@ -98,7 +106,14 @@ class FeedbackClient:
         if response.status_code == 401:
             raise UserInputError('The API key was refused; check your account key.')
         if response.status_code == 403:
-            raise UserInputError('The API key needs Researcher or Business access for this brand.')
+            try:
+                refusal = response.json()
+            except ValueError:
+                refusal = None
+            if (isinstance(refusal, dict) and refusal.get('contract') == CONTRACT
+                    and refusal.get('brand') == brand and refusal.get('error') == 'requires-researcher'):
+                raise UserInputError('The API key needs Researcher or Business access for this brand.')
+            raise APIError('The correction request was refused (HTTP 403); no persistence receipt was received.')
         if response.status_code == 429:
             raise APIError('The correction limit was reached; try again later.')
         if response.status_code != 200:

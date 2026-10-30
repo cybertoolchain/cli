@@ -118,3 +118,51 @@ def test_command_uses_shared_output_and_keeps_ownership_private(monkeypatch, bra
     assert json.loads(result.output)['report_id'] == RECEIPT['report_id']
     assert 'd' * 64 not in result.output
     assert calls == [BODY]
+
+
+@pytest.mark.parametrize('brand', ['cyber', 'ai'])
+def test_origin_payload_hash_covers_exact_once_serialized_bytes(brand):
+    import hashlib
+    from toolchain.feedback import FeedbackClient
+    calls = []
+    report = {**BODY, 'note': 'Résumé “β”\nsecond line'}
+    def edge(req):
+        calls.append(req)
+        if req.method == 'GET':
+            assert 'x-api-key' not in req.headers and 'x-amz-content-sha256' not in req.headers
+            return httpx.Response(200, json={**CAP, 'brand': brand})
+        assert req.headers.get('x-amz-content-sha256') == hashlib.sha256(req.content).hexdigest()
+        assert req.headers['content-type'] == 'application/json'
+        assert json.loads(req.content)['report'] == report
+        return httpx.Response(200, json={**RECEIPT, 'brand': brand})
+    client = httpx.Client(transport=httpx.MockTransport(edge), follow_redirects=True)
+    FeedbackClient(resolve_config(site=brand, api_key='ctk_synthetic'), client=client).submit(report)
+    assert [r.method for r in calls] == ['GET', 'POST']
+
+
+@pytest.mark.parametrize('brand', ['cyber', 'ai'])
+@pytest.mark.parametrize('edge_body', [None, {}, {'error': 'requires-researcher'},
+                                       {'contract': CAP['contract'], 'brand': 'wrong', 'error': 'requires-researcher'}])
+def test_edge_403_does_not_blame_subscription(brand, edge_body):
+    from toolchain.feedback import FeedbackClient
+    def edge(req):
+        if req.method == 'GET':
+            return httpx.Response(200, json={**CAP, 'brand': brand})
+        return httpx.Response(403, json=edge_body) if edge_body is not None else httpx.Response(403, text='Synthetic edge denial')
+    with pytest.raises(ToolchainError) as err:
+        FeedbackClient(resolve_config(site=brand, api_key='ctk_synthetic'),
+                       client=httpx.Client(transport=httpx.MockTransport(edge))).submit(BODY)
+    assert 'Researcher' not in str(err.value) and 'Business' not in str(err.value)
+    assert 'Synthetic' not in str(err.value)
+
+
+@pytest.mark.parametrize('brand', ['cyber', 'ai'])
+def test_explicit_versioned_brand_app_403_can_explain_tier(brand):
+    from toolchain.feedback import FeedbackClient
+    def app(req):
+        if req.method == 'GET':
+            return httpx.Response(200, json={**CAP, 'brand': brand})
+        return httpx.Response(403, json={'contract': CAP['contract'], 'brand': brand, 'error': 'requires-researcher'})
+    with pytest.raises(ToolchainError, match='Researcher'):
+        FeedbackClient(resolve_config(site=brand, api_key='ctk_synthetic'),
+                       client=httpx.Client(transport=httpx.MockTransport(app))).submit(BODY)
