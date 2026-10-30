@@ -20,6 +20,110 @@ def no_network(monkeypatch):
     monkeypatch.setenv('TOOLCHAIN_API_KEY', '')
 
 
+def rename_roster(brand):
+    return {'identity_roster': {'brand': brand, 'tools': [
+        {'name': 'Beacon', 'slug': 'beacon', 'entity_id': 'e_0000000000a1',
+         'join_slug': 'helix', 'canonical_path': '/tools/beacon/', 'former_names': ['Helix', 'Orbit']},
+        {'name': 'Orbit', 'slug': 'orbit'}]}}
+
+
+@pytest.mark.parametrize('brand', ['cyber', 'ai'])
+@pytest.mark.parametrize('keyed', [False, True])
+@pytest.mark.parametrize('query', ['helix', 'beacon'])
+def test_published_roster_binds_original_claim_to_current_tool(monkeypatch, brand, keyed, query):
+    from toolchain.config import SITES
+    from toolchain.source import resolve_source
+    from tests.fakes import FakeClient, FakeResponse
+    cid = 'clm_' + 'a' * 32
+    row = {'subject': 'Helix@Autumn release', 'tool': 'Helix', 'revision': 2,
+           'status': 'supported', 'object': 'Corrected Helix requirement', 'scope': f'brand:{brand}'}
+    free = {'brand': brand, 'claims': {cid: row}, 'history': {cid: [
+        {'revision': 2, 'status': row['status'], 'object': row['object']}]}}
+    client = FakeClient({
+        f'{SITES[brand].site_base}/tools.json': FakeResponse(200, rename_roster(brand)),
+        f'{SITES[brand].site_base}/claims/{brand}.json': FakeResponse(200, free),
+        f'{SITES[brand].api_base}/v1/tools/{query}/history': FakeResponse(200, {
+            'brand': brand, 'tool': 'beacon', 'claims': [{'claim_id': cid, **row}], 'decisions': []})})
+    monkeypatch.setattr('httpx.Client', lambda **kw: client)
+    monkeypatch.setattr('toolchain.groups.history.resolve_source', resolve_source)
+    result = CliRunner().invoke(cli, ['--site', brand, *(['--api-key', 'fixture-key'] if keyed else []), 'history', query])
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)
+    assert body['tool'] == query
+    assert body['claims'][0]['subject'] == 'Helix@Autumn release'
+    assert body['claims'][0]['marker'] == cid + '@2'
+    assert all(not c['headers'] for c in client.calls if c['url'].startswith(SITES[brand].site_base))
+
+
+@pytest.mark.parametrize('brand', ['cyber', 'ai'])
+def test_roster_live_names_ambiguity_and_malformed_proof(brand):
+    import copy
+    from toolchain.groups.history import _roster_members, _identity
+    from toolchain.models import APIError, UserInputError
+    doc = rename_roster(brand)
+    assert _roster_members(doc, brand, 'beacon') == {'beacon', 'helix'}
+    assert _roster_members(doc, brand, 'orbit') == {'orbit'}
+    with pytest.raises(APIError):
+        _identity({'tool': 'Beacon', 'subject': 'Helix@Autumn release'}, brand, {'beacon', 'helix'})
+    shared = copy.deepcopy(doc)
+    shared['identity_roster']['tools'].append({'name':'Lumen','slug':'lumen','entity_id':'e_0000000000e5',
+        'join_slug':'lumen','canonical_path':'/tools/lumen/','former_names':['Helix']})
+    with pytest.raises(UserInputError, match='ambiguous'):
+        _roster_members(shared, brand, 'helix')
+    assert _roster_members(shared, brand, 'beacon') == {'beacon'}
+    mutations = [
+        lambda d: d['identity_roster'].update(brand='ai' if brand=='cyber' else 'cyber'),
+        lambda d: d.update(identity_roster=None),
+        lambda d: d['identity_roster']['tools'].append(d['identity_roster']['tools'][0]),
+        lambda d: d['identity_roster']['tools'][0].update(slug='other'),
+        lambda d: d['identity_roster']['tools'][0].update(entity_id='arbitrary'),
+        lambda d: d['identity_roster']['tools'][0].update(join_slug='../other'),
+        lambda d: d['identity_roster']['tools'][0].update(canonical_path='https://example.invalid/'),
+        lambda d: d['identity_roster']['tools'][0].update(former_names='Helix'),
+        lambda d: d['identity_roster']['tools'][0].update(former_names=[None]),
+        lambda d: d['identity_roster']['tools'][0].pop('entity_id'),
+    ]
+    for change in mutations:
+        bad = copy.deepcopy(doc); change(bad)
+        with pytest.raises(APIError): _roster_members(bad, brand, 'helix')
+    assert _roster_members({}, brand, 'helix') == {'helix'}
+
+
+def test_legacy_roster_does_not_turn_keyed_ambiguity_into_no_marker_success(monkeypatch):
+    class Source:
+        def fetch(self,path,**params):
+            return {} if path=='tools.json' else {'error':'ambiguous-name','choices':[{'slug':'beacon'},{'slug':'lumen'}]}
+    monkeypatch.setattr('toolchain.groups.history.resolve_source',lambda config:Source())
+    result=CliRunner().invoke(cli,['--api-key','fictional-key','history','helix'])
+    assert result.exit_code==2
+    assert 'no_marker' not in result.output
+
+
+@pytest.mark.parametrize('brand',['cyber','ai'])
+@pytest.mark.parametrize('keyed',[False,True])
+@pytest.mark.parametrize('mutation',['same_entity_contradiction','wrong_scope','future_revision','credential_origin'])
+def test_alias_proof_never_weakens_claim_and_history_guards(monkeypatch,brand,keyed,mutation):
+    cid='clm_'+'a'*32
+    row={'subject':'Helix@Autumn release','tool':'Helix','revision':2,'status':'supported','object':'Corrected claim'}
+    revision={'revision':2,'status':'supported','object':'Corrected claim'}
+    if mutation=='same_entity_contradiction':row['tool']='Beacon'
+    if mutation=='wrong_scope':row['scope']='brand:'+('ai' if brand=='cyber' else 'cyber')
+    if mutation=='future_revision':revision['revision']=3
+    if mutation=='credential_origin':revision['origin']='https://reader:FAKE-PRIVATE@example.invalid/notes'
+    public={'brand':brand,'claims':{cid:row},'history':{cid:[revision]}}
+    api={'brand':brand,'tool':'beacon','claims':[{'claim_id':cid,**row}],
+         'decisions':[{'claim_id':cid,**revision}]}
+    class Source:
+        def fetch(self,path,**params):
+            if path=='tools.json':return rename_roster(brand)
+            return api if keyed else public
+    monkeypatch.setattr('toolchain.groups.history.resolve_source',lambda config:Source())
+    result=CliRunner().invoke(cli,['--site',brand,*(['--api-key','fictional-key'] if keyed else []),'history','beacon'])
+    assert result.exit_code==2
+    assert 'Corrected claim' not in result.output
+    assert 'FAKE-PRIVATE' not in result.output and 'example.invalid' not in result.output
+
+
 @pytest.mark.parametrize('brand', ['cyber', 'ai'])
 @pytest.mark.parametrize('command', [['history', 'vendor-tool'], ['tools', 'history', 'vendor-tool']])
 def test_free_history_selects_own_tool_and_brand_and_exposes_revision(monkeypatch, brand, command):
@@ -42,7 +146,7 @@ def test_free_history_selects_own_tool_and_brand_and_exposes_revision(monkeypatc
     result = CliRunner().invoke(cli, ['--site', brand, '--output', 'json', *command], env={'TOOLCHAIN_API_KEY': ''})
     assert result.exit_code == 0, result.output
     body = json.loads(result.output)
-    assert calls == [f'claims/{brand}.json']
+    assert calls == ['tools.json', f'claims/{brand}.json']
     assert [(row['claim_id'], row['revision'], row['marker']) for row in body['claims']] == [('clm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 3, 'clm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@3')]
     assert body['decisions'][0]['claim_id'] == 'clm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     assert 'PRIVATE' not in result.output
@@ -51,6 +155,8 @@ def test_free_history_selects_own_tool_and_brand_and_exposes_revision(monkeypatc
 def test_keyed_history_uses_live_history_and_keeps_machine_markers(monkeypatch):
     class Source:
         def fetch(self, path, **params):
+            if path == 'tools.json':
+                return {}  # Legacy site without the additive identity roster.
             assert path == 'tools/vendor-tool/history'
             return {'claims': [{'claim_id': 'clm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'revision': 4, 'note': 'PRIVATE'}],
                     'decisions': [{'claim_id': 'clm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'revision': 4, 'cause': 'incomplete scope',
@@ -205,6 +311,8 @@ def _invoke_ledger(monkeypatch, doc, brand, keyed=False, output='json'):
 
     class Source:
         def fetch(self, path, **params):
+            if path == 'tools.json':
+                return {}  # Legacy site; every existing strict history assertion still runs.
             assert path == ('tools/vendor-tool/history' if keyed else f'claims/{brand}.json')
             return doc
 

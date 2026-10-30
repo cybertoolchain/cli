@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from urllib.parse import urlsplit
 
 import click
@@ -13,6 +14,57 @@ from ..status_vocab import STATUSES, label as status_label
 _CLAIM_FIELDS = ("claim_id", "revision", "subject", "object", "status", "known_from")
 _DECISION_FIELDS = ("claim_id", "revision", "date", "status", "method", "origin",
                     "role", "reason", "disposition", "cause", "decided_at")
+
+
+def _roster_members(doc: dict, brand: str, query: str) -> set[str]:
+    """Authorize only published, unique same-entity names; live names win.
+
+    The tools feed is historical, so it must never supply live ownership.
+    Older sites without the additive roster retain exact-name behavior.
+    """
+    if not isinstance(doc, dict):
+        raise APIError("The published tool roster is not an object.")
+    if 'identity_roster' not in doc:
+        return {query}
+    try:
+        roster = doc['identity_roster']
+        if not isinstance(roster, dict) or set(roster) != {'brand', 'tools'} or roster['brand'] != brand:
+            raise ValueError
+        if not isinstance(roster['tools'], list):
+            raise ValueError
+        live, aliases, entities = set(), {}, set()
+        fields = {'entity_id', 'join_slug', 'canonical_path', 'former_names'}
+        def text(value):
+            return isinstance(value, str) and bool(value.strip()) and not any(ord(c) < 32 for c in value)
+        for row in roster['tools']:
+            if not isinstance(row, dict) or set(row) not in ({'name', 'slug'}, {'name', 'slug'} | fields):
+                raise ValueError
+            slug = row['slug']
+            if (not text(row['name']) or not text(slug) or tool_slug(row['name']) != slug or slug in live):
+                raise ValueError
+            live.add(slug)
+            if 'entity_id' not in row:
+                continue
+            eid, former = row['entity_id'], row['former_names']
+            if (not isinstance(eid, str) or not re.fullmatch(r'[et]_[0-9a-f]{12}', eid) or eid in entities
+                    or not text(row['join_slug']) or tool_slug(row['join_slug']) != row['join_slug']
+                    or row['canonical_path'] != f'/tools/{slug}/'
+                    or not isinstance(former, list) or any(not text(f) or not tool_slug(f) for f in former)):
+                raise ValueError
+            entities.add(eid)
+            for name in former:
+                aliases.setdefault(tool_slug(name), set()).add(slug)
+    except (ValueError, TypeError, KeyError):
+        raise APIError("The published tool identity roster is invalid.") from None
+    def owners(name):
+        return {name} if name in live else aliases.get(name, set())
+    found = owners(query)
+    if len(found) > 1:
+        raise UserInputError("That former name is ambiguous; use a current tool name.")
+    if not found:
+        raise UserInputError("That tool is not on the selected product's current roster.")
+    canonical = next(iter(found))
+    return {canonical, *(old for old in aliases if owners(old) == {canonical})}
 
 
 def _public_row(row: dict, fields: tuple[str, ...]) -> dict:
@@ -46,7 +98,7 @@ def _claim(row: dict) -> dict:
     return _public_row(row, _CLAIM_FIELDS)
 
 
-def _identity(row: dict, brand: str, slug: str | None = None) -> str | None:
+def _identity(row: dict, brand: str, slug: str | set[str] | None = None) -> str | None:
     if ("brand" in row and row["brand"] != brand
             or "scope" in row and row["scope"] != f"brand:{brand}"):
         raise APIError("The claim history does not match the selected product.")
@@ -64,12 +116,13 @@ def _identity(row: dict, brand: str, slug: str | None = None) -> str | None:
         raise APIError("The history response has conflicting tool identities.")
     selected = tool_slug(tool) if tool is not None else None
     if (tool is not None and not selected
-            or slug is not None and selected is not None and selected != slug):
+            or slug is not None and selected is not None
+            and (selected not in slug if isinstance(slug, set) else selected != slug)):
         raise APIError("The claim history does not match the selected tool.")
     return selected
 
 
-def _public_decisions(rows: list, claims: list[dict], brand: str, slug: str) -> list[dict]:
+def _public_decisions(rows: list, claims: list[dict], brand: str, slug: str | set[str]) -> list[dict]:
     if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         raise APIError("The history response has invalid decisions.")
     heads = {row["claim_id"]: row["revision"] for row in claims}
@@ -84,7 +137,8 @@ def _public_decisions(rows: list, claims: list[dict], brand: str, slug: str) -> 
     return validated
 
 
-def _free_history(doc: dict, brand: str, slug: str) -> tuple[list[dict], list[dict]]:
+def _free_history(doc: dict, brand: str, slug: str, members: set[str] | None = None) -> tuple[list[dict], list[dict]]:
+    members = {slug} if members is None else members
     rows, history_rows = doc.get("claims"), doc.get("history")
     if not isinstance(rows, dict) or not isinstance(history_rows, dict):
         raise APIError("The history response has invalid claims or history.")
@@ -103,7 +157,7 @@ def _free_history(doc: dict, brand: str, slug: str) -> tuple[list[dict], list[di
                 or not isinstance(row["object"], str) or not row["object"].strip()):
             raise APIError("The history response has an incomplete claim.")
         selected = _identity(row, brand)
-        if selected != slug:
+        if selected not in members:
             continue
         revisions = history_rows.get(cid)
         if not isinstance(revisions, list) or not revisions:
@@ -121,7 +175,7 @@ def _free_history(doc: dict, brand: str, slug: str) -> tuple[list[dict], list[di
             raise APIError("The history response does not match the current claim.")
         claims.append(public)
         decisions.extend({**revision, "claim_id": cid} for revision in revisions)
-    return claims, _public_decisions(decisions, claims, brand, slug)
+    return claims, _public_decisions(decisions, claims, brand, members)
 
 
 @click.command("history")
@@ -135,12 +189,16 @@ def history(ctx: click.Context, slug: str) -> None:
     if not slug:
         raise UserInputError("Give a tool name or slug.")
     source = resolve_source(config)
+    roster_source = resolve_source(replace(config, api_key=None)) if config.api_key else source
+    members = _roster_members(roster_source.fetch('tools.json'), config.site_key, slug)
     if config.api_key:
         doc = source.fetch(f"tools/{slug}/history")
         if not isinstance(doc, dict):
             raise APIError("The history response is not an object.")
+        if doc.get('error'):
+            raise APIError("The history request did not resolve to one tool.")
         if ("brand" in doc and doc["brand"] != config.site_key
-                or "tool" in doc and (not isinstance(doc["tool"], str) or tool_slug(doc["tool"]) != slug)):
+                or "tool" in doc and (not isinstance(doc["tool"], str) or tool_slug(doc["tool"]) not in members)):
             raise APIError("The claim history does not match the selected product and tool.")
         result = {"tool": slug, "brand": config.site_key}
         # An older server without markers stays distinguishable from a
@@ -150,14 +208,14 @@ def history(ctx: click.Context, slug: str) -> None:
             if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
                 raise APIError("The history response has invalid claims.")
             for row in rows:
-                _identity(row, config.site_key, slug)
+                _identity(row, config.site_key, members)
             result["claims"] = [_claim(row) for row in rows]
-            result["decisions"] = _public_decisions(doc.get("decisions", []), result["claims"], config.site_key, slug)
+            result["decisions"] = _public_decisions(doc.get("decisions", []), result["claims"], config.site_key, members)
     else:
         doc = source.fetch(f"claims/{config.site_key}.json")
         if not isinstance(doc, dict) or doc.get("brand") != config.site_key:
             raise APIError("The claim history does not match the selected product.")
-        claims, decisions = _free_history(doc, config.site_key, slug)
+        claims, decisions = _free_history(doc, config.site_key, slug, members)
         result = {"tool": slug, "brand": config.site_key, "claims": claims,
                   "decisions": decisions}
     if config.output == "json":
