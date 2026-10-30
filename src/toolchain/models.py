@@ -36,8 +36,11 @@ class ClaimReceipt(TypedDict):
     source_mark: str
     checked_at: str | None
     evidence: list[dict]
+    source_checks: NotRequired[list[dict]]
+    page_changed: NotRequired[bool]
 
 
 class ToolClaims(TypedDict):
     tool: str
     claims: dict[str, ClaimReceipt]
+    freshness: NotRequired[dict | None]

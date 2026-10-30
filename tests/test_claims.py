@@ -8,7 +8,7 @@ from toolchain.source.api import ApiSource
 from .fakes import FakeClient, FakeResponse
 
 PAYLOAD={'tool':'example','claims':{'f-one':{'claim_id':'clm_one','revision':3,'word':'Our summary',
-    'detail':'','source_mark':'One source','checked_at':None,'evidence':[
+    'detail':'Date unknown','source_mark':'One source','checked_at':None,'evidence':[
         {'id':'e-one','origin':'docs','url':'https://example.com/docs','quote':'Inspect packets.',
          'quote_is_vendor':False,'fetched_at':None,'span':None}]}}}
 

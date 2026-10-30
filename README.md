@@ -111,3 +111,5 @@ becomes visible to installed users once one is cut:
 `uv tool install`/`uv tool upgrade` always track `main`'s current commit
 regardless of tags, so `toolchain update` itself always pulls the latest code
 — the release only affects what `toolchain version` reports as available.
+
+`tools get` and `claims` retain the source-check `freshness` object (or `null` until every tracked page qualifies). Words age from the original UTC check timestamp when the CLI reads them, including cached/static replies; release dates never refresh this clock.
