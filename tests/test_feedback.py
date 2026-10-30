@@ -22,6 +22,7 @@ def test_capability_then_one_uncached_write_fixed_endpoint(brand, caplog):
     from toolchain.feedback import FeedbackClient
     import logging
     caplog.set_level(logging.DEBUG)
+    read_endpoints = {site: resolve_config(site=site).site.api_base for site in ('cyber', 'ai')}
     calls = []
     key = 'ctk_SYNTHETIC_DO_NOT_LOG'
     def handler(req):
@@ -43,7 +44,7 @@ def test_capability_then_one_uncached_write_fixed_endpoint(brand, caplog):
     assert [r.method for r in calls] == ['GET', 'POST']
     assert all(r.url.host == 'api.cybertoolchain.io' for r in calls)
     assert key not in caplog.text
-    assert resolve_config(site='ai').site.api_base is None  # read behavior unchanged
+    assert {site: resolve_config(site=site).site.api_base for site in read_endpoints} == read_endpoints
 
 
 @pytest.mark.parametrize('response', [
