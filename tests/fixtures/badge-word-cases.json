@@ -1,0 +1,56 @@
+[
+  {
+    "name": "same UTC day",
+    "checked_at": "2026-10-27T23:30:00Z",
+    "now": "2026-10-27T23:59:00Z",
+    "word": "Checked today"
+  },
+  {
+    "name": "UTC yesterday",
+    "checked_at": "2026-10-27T23:30:00Z",
+    "now": "2026-10-28T00:30:00Z",
+    "word": "Checked yesterday"
+  },
+  {
+    "name": "seven days",
+    "checked_at": "2026-10-21T12:00:00Z",
+    "now": "2026-10-28T12:00:00Z",
+    "word": "Checked this week"
+  },
+  {
+    "name": "eight days",
+    "checked_at": "2026-10-20T12:00:00Z",
+    "now": "2026-10-28T12:00:00Z",
+    "word": "Over a week old"
+  },
+  {
+    "name": "missing",
+    "checked_at": null,
+    "now": "2026-10-28T12:00:00Z",
+    "word": "Date unknown"
+  },
+  {
+    "name": "future",
+    "checked_at": "2026-10-29",
+    "now": "2026-10-28T12:00:00Z",
+    "word": "Date unknown"
+  },
+  {
+    "name": "invalid",
+    "checked_at": "2026-02-30",
+    "now": "2026-10-28T12:00:00Z",
+    "word": "Date unknown"
+  },
+  {
+    "name": "offset",
+    "checked_at": "2026-10-28T00:30:00+02:00",
+    "now": "2026-10-28T01:00:00Z",
+    "word": "Checked yesterday"
+  },
+  {
+    "name": "seven days plus one millisecond",
+    "checked_at": "2026-10-22T12:00:00Z",
+    "now": "2026-10-29T12:00:00.001Z",
+    "word": "Over a week old"
+  }
+]

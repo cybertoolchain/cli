@@ -11,7 +11,7 @@ from toolchain import status_vocab
 
 #: The generator's tct/tests/test_status_vocab_parity.py pins this same digest.
 #: Change the vocabulary there first, copy the file here, update both.
-PINNED_DIGEST = "a669a0856814b6dcd3aec52db6122f212698606c61420b70ce6c3773c7243605"
+PINNED_DIGEST = "19cc6c60fbbceb6e2a7fa706ae62de899b6544bb0d9efaf293dbad04ee75fd2e"
 
 
 def test_copy_matches_the_generator_canonical_file():

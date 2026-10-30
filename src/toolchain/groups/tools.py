@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 
+from ..freshness import age_payload
 from ..helpers import emit, get_config, handle_errors, tool_slug
 from ..models import UserInputError
 from ..source import resolve_source
@@ -86,7 +87,7 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> 
     else:
         data = source.fetch("tools.json")
         data = {**data, "tools": _filter_tools(data["tools"], category, license_, tool_type, q)}
-    emit(data, config)
+    emit(age_payload(data), config)
 
 
 @tools.command("count")
@@ -134,7 +135,8 @@ def tools_get(ctx: click.Context, slug: str) -> None:
                 f"No tracked tool matches '{slug}'. Run 'toolchain tools list' to see slugs."
             )
         data = match
-    emit(data, config)
+    data = {**data, "freshness": data.get("freshness")}
+    emit(age_payload(data), config)
 
 
 @tools.command("releases")
@@ -285,4 +287,4 @@ def claims(ctx: click.Context, slug: str, as_json: bool) -> None:
     if config.debug:
         click.echo(source.curl(path), err=True)
     data = source.fetch(path)
-    emit(data, replace(config, output='json') if as_json else config)
+    emit(age_payload(data), replace(config, output='json') if as_json else config)

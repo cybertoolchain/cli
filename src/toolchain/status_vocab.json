@@ -41,5 +41,13 @@
       "interface_origins": ["api", "cli", "mcp", "interface"],
       "pair_origins": ["release_note", "docs"]
     }
+  },
+  "freshness": {
+    "today": "Checked today",
+    "yesterday": "Checked yesterday",
+    "week": "Checked this week",
+    "old": "Over a week old",
+    "unknown": "Date unknown",
+    "changed": "Page changed since"
   }
 }
