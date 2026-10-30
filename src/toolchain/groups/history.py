@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
 
 import click
 
@@ -24,6 +25,14 @@ def _public_row(row: dict, fields: tuple[str, ...]) -> dict:
         if key != "revision" and value is not None:
             if not isinstance(value, str) or any(ord(c) < 32 and c not in '\n\t' for c in value):
                 raise APIError("The history response has an invalid public value.")
+    if result.get("origin") is not None:
+        try:
+            origin = urlsplit(result["origin"])
+            if (origin.scheme != "https" or not origin.hostname
+                    or origin.username is not None or origin.password is not None):
+                raise ValueError
+        except ValueError:
+            raise APIError("The history response has an invalid public origin.") from None
     if "status" in result:
         if result["status"] not in STATUSES:
             raise APIError("The history response has an invalid reader status.")
@@ -37,11 +46,82 @@ def _claim(row: dict) -> dict:
     return _public_row(row, _CLAIM_FIELDS)
 
 
-def _public_decisions(rows: list, claim_ids: set[str]) -> list[dict]:
+def _identity(row: dict, brand: str, slug: str | None = None) -> str | None:
+    if ("brand" in row and row["brand"] != brand
+            or "scope" in row and row["scope"] != f"brand:{brand}"):
+        raise APIError("The claim history does not match the selected product.")
+    subject_tool = None
+    if "subject" in row:
+        subject = row["subject"]
+        if not isinstance(subject, str):
+            raise APIError("The history response has an invalid release identity.")
+        subject_tool, separator, version = subject.rpartition("@")
+        if not separator or not subject_tool.strip() or not version.strip():
+            raise APIError("The history response has an invalid release identity.")
+    tool = row.get("tool", subject_tool)
+    if ("tool" in row and (not isinstance(tool, str) or not tool.strip())
+            or subject_tool is not None and tool != subject_tool):
+        raise APIError("The history response has conflicting tool identities.")
+    selected = tool_slug(tool) if tool is not None else None
+    if (tool is not None and not selected
+            or slug is not None and selected is not None and selected != slug):
+        raise APIError("The claim history does not match the selected tool.")
+    return selected
+
+
+def _public_decisions(rows: list, claims: list[dict], brand: str, slug: str) -> list[dict]:
     if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         raise APIError("The history response has invalid decisions.")
-    validated = [_public_row(row, _DECISION_FIELDS) for row in rows]
-    return [row for row in validated if row["claim_id"] in claim_ids]
+    heads = {row["claim_id"]: row["revision"] for row in claims}
+    validated = []
+    for row in rows:
+        _identity(row, brand, slug)
+        public = _public_row(row, _DECISION_FIELDS)
+        if public["claim_id"] in heads:
+            if public["revision"] > heads[public["claim_id"]]:
+                raise APIError("The history response has an inconsistent revision.")
+            validated.append(public)
+    return validated
+
+
+def _free_history(doc: dict, brand: str, slug: str) -> tuple[list[dict], list[dict]]:
+    rows, history_rows = doc.get("claims"), doc.get("history")
+    if not isinstance(rows, dict) or not isinstance(history_rows, dict):
+        raise APIError("The history response has invalid claims or history.")
+    claims, decisions = [], []
+    for cid, row in rows.items():
+        if not isinstance(row, dict) or "claim_id" in row and row["claim_id"] != cid:
+            raise APIError("The history response has invalid claims.")
+        public = _claim({**row, "claim_id": cid})
+        if "withheld" in row:
+            if (set(row) != {"revision", "status", "withheld"}
+                    or row["withheld"] != "evidence_revoked" or row["status"] != "unknown"
+                    or history_rows.get(cid) != []):
+                raise APIError("The history response has an invalid withheld claim.")
+            continue
+        if (not {"subject", "status", "object"} <= row.keys()
+                or not isinstance(row["object"], str) or not row["object"].strip()):
+            raise APIError("The history response has an incomplete claim.")
+        selected = _identity(row, brand)
+        if selected != slug:
+            continue
+        revisions = history_rows.get(cid)
+        if not isinstance(revisions, list) or not revisions:
+            raise APIError("The history response is missing the selected claim's history.")
+        previous = 0
+        for revision in revisions:
+            if (not isinstance(revision, dict) or type(revision.get("revision")) is not int
+                    or not previous < revision["revision"] <= row["revision"]
+                    or "claim_id" in revision and revision["claim_id"] != cid):
+                raise APIError("The history response has an inconsistent revision.")
+            previous = revision["revision"]
+        if (previous != row["revision"]
+                or any(row[key] != revisions[-1].get(other) for key, other in
+                       (("status", "status"), ("object", "object"), ("known_from", "date")) if key in row)):
+            raise APIError("The history response does not match the current claim.")
+        claims.append(public)
+        decisions.extend({**revision, "claim_id": cid} for revision in revisions)
+    return claims, _public_decisions(decisions, claims, brand, slug)
 
 
 @click.command("history")
@@ -69,41 +149,17 @@ def history(ctx: click.Context, slug: str) -> None:
             rows = doc["claims"]
             if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
                 raise APIError("The history response has invalid claims.")
-            if any("subject" in row and (not isinstance(row["subject"], str)
-                       or tool_slug(row["subject"].rsplit("@", 1)[0]) != slug) for row in rows):
-                raise APIError("The claim history does not match the selected tool.")
+            for row in rows:
+                _identity(row, config.site_key, slug)
             result["claims"] = [_claim(row) for row in rows]
-            ids = {row["claim_id"] for row in result["claims"]}
-            result["decisions"] = _public_decisions(doc.get("decisions", []), ids)
+            result["decisions"] = _public_decisions(doc.get("decisions", []), result["claims"], config.site_key, slug)
     else:
         doc = source.fetch(f"claims/{config.site_key}.json")
         if not isinstance(doc, dict) or doc.get("brand") != config.site_key:
             raise APIError("The claim history does not match the selected product.")
-        rows = doc.get("claims")
-        if not isinstance(rows, dict):
-            raise APIError("The history response has invalid claims.")
-        claims = []
-        for cid, row in rows.items():
-            if not isinstance(row, dict):
-                raise APIError("The history response has invalid claims.")
-            # The original release identity is Tool@version, including
-            # release titles; use the same slug rule as every tool command.
-            subject = row.get("subject", "")
-            tool = row.get("tool") or (subject.rsplit("@", 1)[0] if isinstance(subject, str) else "")
-            if tool_slug(tool) == slug:
-                claims.append(_claim({**row, "claim_id": cid}))
-        ids = {row["claim_id"] for row in claims}
-        history_rows = doc.get("history", {})
-        if not isinstance(history_rows, dict):
-            raise APIError("The history response has invalid decisions.")
-        decisions = []
-        for cid in ids:
-            revisions = history_rows.get(cid, [])
-            if not isinstance(revisions, list) or any(not isinstance(row, dict) for row in revisions):
-                raise APIError("The history response has invalid decisions.")
-            decisions.extend({**row, "claim_id": cid} for row in revisions)
+        claims, decisions = _free_history(doc, config.site_key, slug)
         result = {"tool": slug, "brand": config.site_key, "claims": claims,
-                  "decisions": _public_decisions(decisions, ids)}
+                  "decisions": decisions}
     if config.output == "json":
         emit(result, config)
     elif "claims" not in result:
