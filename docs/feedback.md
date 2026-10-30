@@ -18,9 +18,9 @@ the selected brand. This does not change the CLI's existing read API selection.
 `--kind` accepts wrong, missing, outdated or unclear. `--predicate` accepts mcp,
 api, capability, feature or price. `--proposal` takes that predicate's JSON shape,
 validated again by the server against the exact published fact. Optional `--note`
-is limited to 500 characters; `--evidence-url` is a public URL. File attachments
-are not supported by this release. Do not put personal details, credentials or
-private customer information in notes, proposal text or URLs.
+is limited to 500 characters; `--evidence-url` is a public URL. Do not put personal
+details, credentials or private customer information in notes, proposal text or
+URLs.
 
 The key only admits and limits the request. It is not an account session: the
 stored report carries no account or key identity, counts in the same anonymous
@@ -40,9 +40,38 @@ never printed by this write client, including with `--debug`.
 
 A random ownership capability exists in memory for the request. Internal callers
 can reuse it for an idempotent retry; the CLI does not print or save it, and this
-release has no CLI edit, withdrawal, deletion or attachment command. Losing that
-capability cannot be repaired by presenting the API key. Future attachment support
-must authenticate possession separately, without linking the report to the key.
+release has no CLI edit, withdrawal or deletion command. Attachment uploads use
+that same in-memory capability to prove ownership separately from API-key
+admission. Losing the capability cannot be repaired by presenting the API key.
+
+## Attachments
+
+Repeat `--attachment FILE` (or `-a FILE`) on `toolchain flag` to attach selected
+local evidence, for example `--attachment screenshot.png --attachment notes.txt`.
+Supported files are PNG, JPEG, WebP, GIF, PDF, plain text and Markdown: up to three
+regular files, 8 MiB each and 16 MiB total. Symlinks and unsupported extensions are
+refused before the report is sent. The server also caps reservations at 64 MiB per
+IP per day; pending uploads count against the limits.
+
+The report is stored first. The client then checks fresh attachment availability
+and requests a fixed, one-shot upload URL using the private ownership capability.
+File bytes go only to the selected brand's private quarantine bucket, with the
+signed content type and length, a 15-minute expiry and a conditional PUT. API
+keys and the ownership capability are never forwarded to that upload URL. The
+CLI does not inspect or render file contents, cache files, or print or save the
+ownership capability. The offline scanner identifies the actual type and
+converts accepted files to inert PNG or plain text; originals are erased. Files
+and renditions are never published or sent to a model. MCP remains URL-only and
+does not accept binary uploads.
+
+Attachments require separately approved live scanner qualification and deployment
+configuration. The committed local engine acceptance does not enable uploads.
+An unavailable scanner, server refusal or failed file upload leaves the report
+received; the error says the report was received and explains that attachments
+were unavailable, refused or unconfirmed. Do not resubmit the report merely to
+retry a file: this CLI has no separate attachment retry command, and its private
+ownership capability is not retained after the invocation. A successful upload
+means waiting for the safety check, not that the file was accepted as clean.
 
 ## Separate activation and release
 
