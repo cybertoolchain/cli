@@ -28,6 +28,7 @@
       "documented": "Documented",
       "summary": "Our summary"
     },
+    "run_mark": "Verified by running",
     "marks": {
       "disagree": "Sources disagree",
       "three": "Three sources",

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 _DOC=json.loads(Path(__file__).with_name('status_vocab.json').read_text())
 _STALE_AFTER=timedelta(days=_DOC['words']['gates']['stale_after_days'])
+_RAN_WITHIN=timedelta(days=_DOC['words']['gates']['ran_within_days'])
 _ISO = re.compile(
     r"([0-9]{4})-([0-9]{2})-([0-9]{2})"
     r"(?:T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2})?)?"
@@ -63,6 +64,22 @@ def age_freshness(value, *, now=None):
         return None
     return {'word':badge_word(checked,now=now),'checked_at':checked.isoformat(),'pages':value['pages'],'pages_checked':value['pages_checked']}
 
+def fresh_run(evidence, *, now):
+    """The date of the newest passed run in public rows, if it's still inside the run window."""
+    ran=[]
+    for row in evidence or []:
+        test=row.get('test') if isinstance(row,dict) else None
+        if isinstance(test,dict) and test.get('outcome')=='passed':
+            at=_parse(test.get('executed_at'))
+            if at is not None and at<=now and now-at<=_RAN_WITHIN:ran.append((at,test['executed_at']))
+    return max(ran)[1] if ran else None
+
+
+def _run_mark(claims, *, now):
+    ran=[at for at in (fresh_run(row.get('evidence'),now=now) for row in claims) if at]
+    return {'word':_DOC['words']['run_mark'],'executed_at':max(ran,key=_parse)} if ran else None
+
+
 def age_payload(payload, *, now=None):
     now=_utc(now or datetime.now(timezone.utc))
     result=dict(payload)
@@ -76,6 +93,8 @@ def age_payload(payload, *, now=None):
             if checked and checked>now:checked=None
             word=row['word']
             if checked and now-checked>_STALE_AFTER and word not in [labels[k] for k in ('corrected','under_review','disagree','not_checked')]:word=labels['stale']
+            if word==labels['ran_it'] and fresh_run(row.get('evidence'),now=now) is None:word=labels['saw_it']
             claims[key]={**row,'word':word,'checked_at':checked.isoformat() if checked else None,'detail':badge_word(checked,now=now)+(' · '+_DOC['freshness']['changed'] if row.get('page_changed') else '')}
         result['claims']=claims
+        if 'run_mark' in result:result['run_mark']=_run_mark(claims.values(),now=now)
     return result
