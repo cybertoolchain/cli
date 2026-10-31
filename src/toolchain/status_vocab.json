@@ -28,6 +28,7 @@
       "documented": "Documented",
       "summary": "Our summary"
     },
+    "run_mark": "Verified by running",
     "marks": {
       "disagree": "Sources disagree",
       "three": "Three sources",
@@ -40,7 +41,9 @@
       "ran_within_days": 90,
       "interface_origins": ["api", "cli", "mcp", "interface"],
       "pair_origins": ["release_note", "docs"]
-    }
+    },
+    "source_types": {"release_note": "Release note", "docs": "Docs", "repo": "Repository", "api": "API", "cli": "CLI", "mcp": "MCP", "interface": "Interface"},
+    "unknown_source_type": "Source evidence"
   },
   "freshness": {
     "today": "Checked today",

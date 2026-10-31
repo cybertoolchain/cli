@@ -44,3 +44,4 @@ class ToolClaims(TypedDict):
     tool: str
     claims: dict[str, ClaimReceipt]
     freshness: NotRequired[dict | None]
+    run_mark: NotRequired[dict | None]
