@@ -48,3 +48,31 @@ from pathlib import Path
 @pytest.mark.parametrize('case',json.loads((Path(__file__).parent/'fixtures/badge-word-cases.json').read_text()),ids=lambda row:row['name'])
 def test_shared_badge_fixture(case):
     assert badge_word(case['checked_at'],now=datetime.fromisoformat(case['now'].replace('Z','+00:00')))==case['word']
+
+
+def _ran(when,outcome='passed'):
+    return {'word':'We ran it','detail':None,'checked_at':'2026-10-27T00:00:00Z','source_mark':'One source',
+        'evidence':[{'test':{'outcome':outcome,'executed_at':when}}]}
+
+
+def test_a_run_past_its_window_reads_saw_it_and_loses_the_mark():
+    got=age_payload({'claims':{'old':_ran('2026-07-01T00:00:00Z')},'run_mark':{'word':'Verified by running','executed_at':'2026-07-01T00:00:00Z'}},now=NOW)
+    assert got['claims']['old']['word']=='Saw it'
+    assert got['run_mark'] is None
+
+
+def test_a_current_run_keeps_its_word_and_the_mark_names_the_newest():
+    got=age_payload({'claims':{'a':_ran('2026-10-01T00:00:00Z'),'b':_ran('2026-10-20T00:00:00Z')},'run_mark':{'word':'Verified by running','executed_at':'2026-10-01T00:00:00Z'}},now=NOW)
+    assert got['claims']['a']['word']=='We ran it'
+    assert got['run_mark']=={'word':'Verified by running','executed_at':'2026-10-20T00:00:00Z'}
+
+
+@pytest.mark.parametrize('row',[_ran('2026-10-20T00:00:00Z','failed'),_ran('2026-10-20T00:00:00Z','unknown'),_ran('2027-01-01T00:00:00Z'),_ran(None),{**_ran('2026-10-20T00:00:00Z'),'evidence':[]}])
+def test_a_run_that_earns_nothing_carries_no_mark(row):
+    got=age_payload({'claims':{'one':row},'run_mark':{'word':'Verified by running','executed_at':'2026-10-20T00:00:00Z'}},now=NOW)
+    assert got['claims']['one']['word']=='Saw it'
+    assert got['run_mark'] is None
+
+
+def test_a_payload_without_a_mark_gains_no_key():
+    assert 'run_mark' not in age_payload({'claims':{}},now=NOW)
