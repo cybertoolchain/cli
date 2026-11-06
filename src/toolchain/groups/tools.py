@@ -42,18 +42,31 @@ def _parse_ext(values) -> list[str]:
 def _require_ext_fields(rows: list[dict]) -> None:
     """A projection from before extensibility shipped has no such field on any
     row. Say so, rather than return an empty list that reads as "none"."""
-    if rows and not any("extensibility_types" in row for row in rows):
+    if rows and not any("extensibility_types" in row or "extensibility_contexts" in row for row in rows):
         raise UserInputError(
             "This data does not include extensibility information yet, so --ext "
             "cannot filter it. Upgrade toolchain or try again after the next site update."
         )
 
 
-def _filter_ext(rows: list[dict], ext: list[str]) -> list[dict]:
+def _filter_ext(rows: list[dict], ext: list[str], mode: str = "any", language: str | None = None) -> list[dict]:
     """Any semantics: keep a tool that has at least one selected option."""
     _require_ext_fields(rows)
-    wanted = set(ext)
-    return [row for row in rows if wanted & set(row.get("extensibility_types") or ())]
+    if mode=='any' and not language:
+        wanted=set(ext)
+        return [row for row in rows if wanted & set(row.get('extensibility_types') or ())]
+    if rows and not any('extensibility_contexts' in row for row in rows):
+        raise UserInputError('This data does not include extension context information yet; upgrade and retry after publication.')
+    selected=set(ext);out=[]
+    for row in rows:
+        groups={}
+        for context in row.get('extensibility_contexts') or []:
+            if not context.get('offering_id') or not isinstance(context.get('restrictions'),list):continue
+            if language and language.casefold() not in {v.casefold() for v in context.get('languages',[])}:continue
+            key=(context['offering_id'],tuple(sorted(context['restrictions'])))
+            groups.setdefault(key,set()).update(context.get('options') or [])
+        if any(selected<=values if mode=='all' else bool(selected & values) for values in groups.values()):out.append(row)
+    return out
 
 
 def _ext_status(row: dict) -> str | None:
@@ -124,18 +137,24 @@ def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[di
 @click.option("--q", default=None)
 @click.option("--cursor", default=None)
 @click.option("--ext", "ext", multiple=True, help="Extensibility option (api, mcp, sdk, plugin, scripting, ...). Repeat or comma-separate; matches a tool with ANY.")
+@click.option('--ext-mode',type=click.Choice(['any','all']),default='any')
+@click.option('--ext-language',default=None,help='Language on the documented extension surface.')
 @click.pass_context
 @handle_errors
-def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor, ext) -> None:
+def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor, ext, ext_mode, ext_language) -> None:
     """Every tracked tool. No key: the current watchlist snapshot from the
     site. With a key: live, server-side filtered and paginated."""
     config = get_config(ctx)
     ext_ids = _parse_ext(ext)
+    if (ext_mode!='any' or ext_language) and not ext_ids:
+        raise UserInputError('--ext is required for extension refinements.')
     source = resolve_source(config)
     params = {
         k: v
         for k, v in {
             "extensibility": ",".join(ext_ids) or None,
+            "extensibility_mode":ext_mode if ext_mode!='any' else None,
+            "extensibility_language":ext_language,
             "category": category,
             "license": license_,
             "tool_type": tool_type,
@@ -146,13 +165,15 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor, ext
     }
     if config.api_key:
         data = source.fetch("tools", **params)
+        if (ext_mode!='any' or ext_language) and data.get('extensibility_filter_version')!=2:
+            raise UserInputError('The API does not support extension context refinements yet; retry after its upgrade.')
         if ext_ids:
             _require_ext_fields(data.get("tools") or [])
     else:
         data = source.fetch("tools.json")
         rows = _filter_tools(data["tools"], category, license_, tool_type, q)
         if ext_ids:
-            rows = _filter_ext(rows, ext_ids)
+            rows = _filter_ext(rows, ext_ids, ext_mode, ext_language)
         data = {**data, "tools": rows}
         if ext_ids and "count" in data:
             data["count"] = len(rows)
@@ -164,13 +185,17 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor, ext
 @click.option("--license", "license_", default=None, type=click.Choice(["open-source", "commercial"]))
 @click.option("--tool_type", default=None)
 @click.option("--ext", "ext", multiple=True, help="Extensibility option; repeat or comma-separate (ANY).")
+@click.option('--ext-mode',type=click.Choice(['any','all']),default='any')
+@click.option('--ext-language',default=None,help='Language on the documented extension surface.')
 @click.pass_context
 @handle_errors
-def tools_count(ctx: click.Context, category, license_, tool_type, ext) -> None:
+def tools_count(ctx: click.Context, category, license_, tool_type, ext, ext_mode, ext_language) -> None:
     """Just the number. No key: counted client-side from the free watchlist
     snapshot. With a key: live, server-side count."""
     config = get_config(ctx)
     ext_ids = _parse_ext(ext)
+    if (ext_mode!='any' or ext_language) and not ext_ids:
+        raise UserInputError('--ext is required for extension refinements.')
     source = resolve_source(config)
     if config.api_key:
         params = {
@@ -180,15 +205,19 @@ def tools_count(ctx: click.Context, category, license_, tool_type, ext) -> None:
                 "license": license_,
                 "tool_type": tool_type,
                 "extensibility": ",".join(ext_ids) or None,
+            "extensibility_mode":ext_mode if ext_mode!='any' else None,
+            "extensibility_language":ext_language,
             }.items()
             if v is not None
         }
         data = source.fetch("tools/count", **params)
+        if (ext_mode!='any' or ext_language) and data.get('extensibility_filter_version')!=2:
+            raise UserInputError('The API does not support extension context refinements yet; retry after its upgrade.')
     else:
         site_data = source.fetch("tools.json")
         filtered = _filter_tools(site_data["tools"], category, license_, tool_type, None)
         if ext_ids:
-            filtered = _filter_ext(filtered, ext_ids)
+            filtered = _filter_ext(filtered, ext_ids, ext_mode, ext_language)
         data = {"total": len(filtered)}
     emit(data, config)
 

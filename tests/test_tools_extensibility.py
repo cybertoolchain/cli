@@ -143,3 +143,24 @@ def test_get_unknown_coverage_wording(stub):
     assert out["extensibility_status"] == "Not checked yet"
     out = json.loads(run("tools", "get", "falco").output)
     assert out["extensibility_status"] == "Partly checked"
+
+
+def test_refined_all_uses_one_context_and_language_without_a_key(monkeypatch):
+    rows=[{'tool':'Acme','extensibility_types':['api','sdk'],'extensibility_contexts':[
+        {'options':['api'],'offering_id':'enterprise','restrictions':[],'languages':[]},
+        {'options':['sdk'],'offering_id':'community','restrictions':[],'languages':['Python']}]}]
+    class Source:
+        def fetch(self,path,**kw):return {'tools':rows}
+    monkeypatch.setattr('toolchain.groups.tools.resolve_source',lambda config:Source())
+    result=CliRunner().invoke(cli,['tools','list','--ext','api,sdk','--ext-mode','all'])
+    assert result.exit_code==0 and json.loads(result.output)['tools']==[]
+    result=CliRunner().invoke(cli,['tools','list','--ext','api','--ext-language','Python'])
+    assert result.exit_code==0 and json.loads(result.output)['tools']==[]
+
+
+def test_refinement_without_context_contract_is_explicitly_unsupported(monkeypatch):
+    class Source:
+        def fetch(self,path,**kw):return {'tools':[{'tool':'Acme','extensibility_types':['api']}]}
+    monkeypatch.setattr('toolchain.groups.tools.resolve_source',lambda config:Source())
+    result=CliRunner().invoke(cli,['tools','count','--ext','api','--ext-mode','all'])
+    assert result.exit_code!=0 and 'context' in result.output.lower()

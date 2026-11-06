@@ -115,3 +115,11 @@ regardless of tags, so `toolchain update` itself always pulls the latest code
 — the release only affects what `toolchain version` reports as available.
 
 `tools get` and `claims` retain the source-check `freshness` object (or `null` until every tracked page qualifies). Words age from the original UTC check timestamp when the CLI reads them, including cached/static replies; release dates never refresh this clock.
+
+Extension filters accept comma-separated options, for example
+`toolchain tools list --ext api,sdk`. The default matches any selected option.
+Use `--ext-mode all` to require the options within one documented offering and
+restriction context, and `--ext-language Python` to require that language on
+each matching surface. These refinements require a compatible server or the
+current public feed; older consumers return an explicit unsupported error.
+Unassessed tools do not count as having no extension options.
