@@ -75,6 +75,11 @@ class ApiSource:
                 f"{message} Renew or upgrade on your account page, "
                 "then run the command again."
             )
+        if isinstance(body, dict) and body.get("error") == "requires-practitioner":
+            return UserInputError(
+                "Plays requires a current Practitioner or higher subscription. "
+                "Renew or upgrade on your account page, then run the command again."
+            )
         return APIError(f"Access to {url} was refused (HTTP 403).")
 
     def curl(self, path: str, **params: Any) -> str:

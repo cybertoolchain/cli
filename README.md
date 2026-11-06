@@ -123,3 +123,10 @@ restriction context, and `--ext-language Python` to require that language on
 each matching surface. These refinements require a compatible server or the
 current public feed; older consumers return an explicit unsupported error.
 Unassessed tools do not count as having no extension options.
+
+`toolchain --limit 3 plays --tools Acme,Other --since 2026-11-01` reads current
+evidenced actions from the selected product's API. A current Practitioner or
+higher subscription and `TOOLCHAIN_API_KEY` are required. Use `--site ai` before
+`plays` for AI Toolchain. Output retains each public claim's ID and revision;
+`held` and `unavailable` stay explicit instead of appearing as a quiet day.
+Use `plays --claim-id clm_...` to inspect one exact published claim.
