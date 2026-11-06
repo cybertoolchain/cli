@@ -243,6 +243,10 @@ from .groups.search import search as search_command
 
 cli.add_command(search_command, name="search")
 
+from .groups.plays import plays as plays_command
+
+cli.add_command(plays_command, name="plays")
+
 from .groups.version import update_command, version_command
 
 cli.add_command(version_command, name="version")
