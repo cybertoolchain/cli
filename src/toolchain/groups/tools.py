@@ -74,6 +74,8 @@ def _ext_status(row: dict) -> str | None:
     'reviewed' as a promise; a checked tool says 'Checked' plus the revision
     date when the revision starts with one."""
     coverage = row.get("extensibility_coverage")
+    if isinstance(coverage, dict):
+        coverage = coverage.get("state")
     if coverage is None:
         return None
     if coverage == "reviewed":

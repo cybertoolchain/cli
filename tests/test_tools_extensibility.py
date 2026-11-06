@@ -164,3 +164,10 @@ def test_refinement_without_context_contract_is_explicitly_unsupported(monkeypat
     monkeypatch.setattr('toolchain.groups.tools.resolve_source',lambda config:Source())
     result=CliRunner().invoke(cli,['tools','count','--ext','api','--ext-mode','all'])
     assert result.exit_code!=0 and 'context' in result.output.lower()
+
+
+def test_get_supports_the_current_coverage_object(stub):
+    from toolchain.groups.tools import _ext_status
+    for state,expected in [('reviewed','Checked'),('partial','Partly checked'),('unknown','Not checked yet')]:
+        assert _ext_status({'extensibility_coverage':{'state':state,'assessed_options':[],'held_options':[]},
+                            'extensibility_revision':'a'*64})==expected
