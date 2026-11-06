@@ -1,6 +1,8 @@
 # src/toolchain/groups/tools.py
 from __future__ import annotations
 
+import re
+
 import click
 
 from ..freshness import age_payload
@@ -8,6 +10,63 @@ from ..helpers import emit, get_config, handle_errors, tool_slug
 from ..models import UserInputError
 from ..source import resolve_source
 from ..source.entries import published_entries
+
+
+EXT_OPTIONS = ("api", "mcp", "sdk", "plugin", "scripting", "cli", "webhook", "declarative")
+
+_COVERAGE_WORDS = {
+    "unknown": "Not checked yet",
+    "partial": "Partly checked",
+    "not_applicable": "Not applicable",
+}
+
+
+def _parse_ext(values) -> list[str]:
+    """--ext is repeatable and comma-separated. Returns the option ids in the
+    order given, de-duplicated; anything outside the vocabulary is an error."""
+    ids: list[str] = []
+    for value in values or ():
+        for part in str(value).split(","):
+            part = part.strip().lower()
+            if not part:
+                continue
+            if part not in EXT_OPTIONS:
+                raise UserInputError(
+                    f"Unknown extensibility option '{part}'. Choose from: {', '.join(EXT_OPTIONS)}."
+                )
+            if part not in ids:
+                ids.append(part)
+    return ids
+
+
+def _require_ext_fields(rows: list[dict]) -> None:
+    """A projection from before extensibility shipped has no such field on any
+    row. Say so, rather than return an empty list that reads as "none"."""
+    if rows and not any("extensibility_types" in row for row in rows):
+        raise UserInputError(
+            "This data does not include extensibility information yet, so --ext "
+            "cannot filter it. Upgrade toolchain or try again after the next site update."
+        )
+
+
+def _filter_ext(rows: list[dict], ext: list[str]) -> list[dict]:
+    """Any semantics: keep a tool that has at least one selected option."""
+    _require_ext_fields(rows)
+    wanted = set(ext)
+    return [row for row in rows if wanted & set(row.get("extensibility_types") or ())]
+
+
+def _ext_status(row: dict) -> str | None:
+    """Reader wording for a tool's coverage. Never the internal word
+    'reviewed' as a promise; a checked tool says 'Checked' plus the revision
+    date when the revision starts with one."""
+    coverage = row.get("extensibility_coverage")
+    if coverage is None:
+        return None
+    if coverage == "reviewed":
+        m = re.match(r"\d{4}-\d{2}-\d{2}", str(row.get("extensibility_revision") or ""))
+        return f"Checked {m.group(0)}" if m else "Checked"
+    return _COVERAGE_WORDS.get(coverage, "Not checked yet")
 
 
 @click.group()
@@ -64,16 +123,19 @@ def _filter_tools(rows: list[dict], category, license_, tool_type, q) -> list[di
 @click.option("--tool_type", default=None)
 @click.option("--q", default=None)
 @click.option("--cursor", default=None)
+@click.option("--ext", "ext", multiple=True, help="Extensibility option (api, mcp, sdk, plugin, scripting, ...). Repeat or comma-separate; matches a tool with ANY.")
 @click.pass_context
 @handle_errors
-def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> None:
+def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor, ext) -> None:
     """Every tracked tool. No key: the current watchlist snapshot from the
     site. With a key: live, server-side filtered and paginated."""
     config = get_config(ctx)
+    ext_ids = _parse_ext(ext)
     source = resolve_source(config)
     params = {
         k: v
         for k, v in {
+            "extensibility": ",".join(ext_ids) or None,
             "category": category,
             "license": license_,
             "tool_type": tool_type,
@@ -84,9 +146,16 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> 
     }
     if config.api_key:
         data = source.fetch("tools", **params)
+        if ext_ids:
+            _require_ext_fields(data.get("tools") or [])
     else:
         data = source.fetch("tools.json")
-        data = {**data, "tools": _filter_tools(data["tools"], category, license_, tool_type, q)}
+        rows = _filter_tools(data["tools"], category, license_, tool_type, q)
+        if ext_ids:
+            rows = _filter_ext(rows, ext_ids)
+        data = {**data, "tools": rows}
+        if ext_ids and "count" in data:
+            data["count"] = len(rows)
     emit(age_payload(data), config)
 
 
@@ -94,23 +163,32 @@ def tools_list(ctx: click.Context, category, license_, tool_type, q, cursor) -> 
 @click.option("--category", default=None)
 @click.option("--license", "license_", default=None, type=click.Choice(["open-source", "commercial"]))
 @click.option("--tool_type", default=None)
+@click.option("--ext", "ext", multiple=True, help="Extensibility option; repeat or comma-separate (ANY).")
 @click.pass_context
 @handle_errors
-def tools_count(ctx: click.Context, category, license_, tool_type) -> None:
+def tools_count(ctx: click.Context, category, license_, tool_type, ext) -> None:
     """Just the number. No key: counted client-side from the free watchlist
     snapshot. With a key: live, server-side count."""
     config = get_config(ctx)
+    ext_ids = _parse_ext(ext)
     source = resolve_source(config)
     if config.api_key:
         params = {
             k: v
-            for k, v in {"category": category, "license": license_, "tool_type": tool_type}.items()
+            for k, v in {
+                "category": category,
+                "license": license_,
+                "tool_type": tool_type,
+                "extensibility": ",".join(ext_ids) or None,
+            }.items()
             if v is not None
         }
         data = source.fetch("tools/count", **params)
     else:
         site_data = source.fetch("tools.json")
         filtered = _filter_tools(site_data["tools"], category, license_, tool_type, None)
+        if ext_ids:
+            filtered = _filter_ext(filtered, ext_ids)
         data = {"total": len(filtered)}
     emit(data, config)
 
@@ -136,6 +214,9 @@ def tools_get(ctx: click.Context, slug: str) -> None:
             )
         data = match
     data = {**data, "freshness": data.get("freshness")}
+    status = _ext_status(data)
+    if status is not None:
+        data["extensibility_status"] = status
     emit(age_payload(data), config)
 
 
